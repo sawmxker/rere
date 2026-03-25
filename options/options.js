@@ -1,7 +1,8 @@
 const DEFAULT_SETTINGS = {
     suffix: "watch",
     searchEngine: "google",
-    customSearchUrl: ""
+    customSearchUrl: "",
+    customEngines: []
 };
 
 const SEARCH_ENGINES = {
@@ -33,6 +34,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const saveBtn = document.getElementById('saveBtn');
     const resetBtn = document.getElementById('resetBtn');
     const status = document.getElementById('status');
+    
+    // Custom engines fields
+    const customEngineNameInput = document.getElementById('customEngineName');
+    const customEngineUrlInput = document.getElementById('customEngineUrl');
+    const addCustomEngineBtn = document.getElementById('addCustomEngineBtn');
+    const customEnginesList = document.getElementById('customEnginesList');
 
     // Load saved settings
     try {
@@ -46,6 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateCustomUrlVisibility();
         updatePreview();
         checkYandexDomain();
+        renderCustomEngines(settings.customEngines || []);
     } catch (error) {
         console.error('Error loading settings:', error);
         showStatus('Error loading settings', 'error');
@@ -61,6 +69,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     customUrlInput.addEventListener('input', () => {
         updatePreview();
         checkYandexDomain();
+    });
+
+    // Add custom engine
+    addCustomEngineBtn.addEventListener('click', async () => {
+        const name = customEngineNameInput.value.trim();
+        const url = customEngineUrlInput.value.trim();
+
+        if (!name || !url) {
+            showStatus('Please enter both name and URL', 'error');
+            return;
+        }
+
+        if (!url.includes('{query}')) {
+            showStatus('URL must contain {query} placeholder', 'error');
+            return;
+        }
+
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            showStatus('URL must start with http:// or https://', 'error');
+            return;
+        }
+
+        try {
+            const result = await browser.storage.local.get(['customEngines']);
+            const customEngines = result.customEngines || [];
+            
+            customEngines.push({
+                id: Date.now(),
+                name: name,
+                url: url
+            });
+
+            await browser.storage.local.set({ customEngines });
+            
+            customEngineNameInput.value = '';
+            customEngineUrlInput.value = '';
+            
+            renderCustomEngines(customEngines);
+            showStatus('Search engine added successfully!', 'success');
+        } catch (error) {
+            console.error('Error adding search engine:', error);
+            showStatus('Error adding search engine', 'error');
+        }
     });
 
     function updateCustomUrlVisibility() {
@@ -105,6 +156,64 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => {
             status.className = 'status';
         }, 3000);
+    }
+
+    function renderCustomEngines(customEngines) {
+        if (!customEnginesList) return;
+        
+        customEnginesList.innerHTML = '';
+        
+        if (customEngines.length === 0) {
+            customEnginesList.innerHTML = '<div style="color: #888; padding: 10px;">No custom search engines yet</div>';
+            return;
+        }
+
+        customEngines.forEach((engine, index) => {
+            const engineDiv = document.createElement('div');
+            engineDiv.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                padding: 12px;
+                background: #2a2a2a;
+                border-radius: 4px;
+                margin-bottom: 12px;
+            `;
+
+            const engineInfo = document.createElement('div');
+            engineInfo.innerHTML = `
+                <div style="font-weight: 600; color: #fff;">${engine.name}</div>
+                <div style="font-size: 12px; color: #888; word-break: break-all;">${engine.url}</div>
+            `;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.style.cssText = `
+                background: #de3217;
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                cursor: pointer;
+                font-size: 12px;
+                align-self: flex-start;
+            `;
+            deleteBtn.onclick = async () => {
+                try {
+                    const result = await browser.storage.local.get(['customEngines']);
+                    const updated = result.customEngines.filter(e => e.id !== engine.id);
+                    await browser.storage.local.set({ customEngines: updated });
+                    renderCustomEngines(updated);
+                    showStatus('Search engine deleted', 'success');
+                } catch (error) {
+                    showStatus('Error deleting search engine', 'error');
+                }
+            };
+
+            engineDiv.appendChild(engineInfo);
+            engineDiv.appendChild(deleteBtn);
+            customEnginesList.appendChild(engineDiv);
+        });
     }
 
     // Save settings
@@ -154,6 +263,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 updateCustomUrlVisibility();
                 yandexWarning.classList.remove('show');
+                renderCustomEngines([]);
                 showStatus('Settings reset to defaults', 'success');
             } catch (error) {
                 console.error('Error resetting settings:', error);

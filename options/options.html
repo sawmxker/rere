@@ -163,6 +163,31 @@
             color: #b2d367;
             word-break: break-all;
         }
+        .custom-engine-input {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .custom-engine-input input {
+            width: 100%;
+        }
+        .add-engine-btn {
+            background: #f5c518;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            align-self: flex-start;
+        }
+        .add-engine-btn:hover {
+            background: #e2b616;
+        }
+        #customEnginesList {
+            margin-top: 16px;
+        }
     </style>
 </head>
 <body>
@@ -208,6 +233,26 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="section">
+            <h2>Add Custom Search Engines</h2>
+            <div class="help-text">Add custom search engines that will appear in the dropdown menu on IMDb pages.</div>
+            
+            <div class="custom-engine-input">
+                <div>
+                    <label for="customEngineName">Search Engine Name</label>
+                    <input type="text" id="customEngineName" placeholder="e.g., Google Movies">
+                </div>
+                <div>
+                    <label for="customEngineUrl">Search URL</label>
+                    <input type="text" id="customEngineUrl" placeholder="https://example.com/search?q={query}">
+                    <div class="help-text">Use <span class="help-code">{query}</span> as placeholder for the search term.</div>
+                </div>
+                <button type="button" id="addCustomEngineBtn" class="add-engine-btn">Add Search Engine</button>
+            </div>
+            
+            <div id="customEnginesList"></div>
         </div>
 
         <div class="section">

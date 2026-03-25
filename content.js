@@ -72,6 +72,25 @@
         }
     }
 
+    function buildSearchUrl(query, engine = 'google', customUrl = '') {
+        const encodedQuery = encodeURIComponent(query.trim());
+        
+        if (engine === 'custom' && customUrl && customUrl.includes('{query}')) {
+            return customUrl.replace('{query}', encodedQuery);
+        }
+        
+        switch (engine) {
+            case 'duckduckgo':
+                return `https://duckduckgo.com/?q=${encodedQuery}`;
+            case 'bing':
+                return `https://www.bing.com/search?q=${encodedQuery}`;
+            case 'yandex':
+                return `https://yandex.ru/search/?text=${encodedQuery}`;
+            default:
+                return `https://www.google.com/search?q=${encodedQuery}`;
+        }
+    }
+
     function createButton() {
         const wrapper = document.createElement('div');
         wrapper.className = "ipc-split-button ipc-btn--theme-baseAlt ipc-split-button--ellide-false ipc-split-button--button-radius ipc-btn--core-accent1 ipc-split-button--width-full";
@@ -100,49 +119,29 @@
         mainBtn.appendChild(icon);
         mainBtn.appendChild(textDiv);
 
-        // mainBtn.onclick = (e) => {
-        //     e.stopPropagation();
-        //     e.preventDefault();
-        //     const { title, year } = getTitleAndYear();
-        //     const q = `${title} ${year}`.trim();
-        //     const SEARCH_CONFIG = {
-        //         google: {
-        //             suffix: "watch",
-        //             enabled: true
-        //         }
-        //     };
-
-        //     const searchQuery = SEARCH_CONFIG.google.enabled 
-        //         ? `${q} ${SEARCH_CONFIG.google.suffix}`.trim()
-        //         : q;
-
-        //     window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, '_blank');
-        
+        // ИСПРАВЛЕНО: Основная кнопка теперь правильно читает настройки
         mainBtn.onclick = async (e) => {
             e.stopPropagation();
             e.preventDefault();
 
             const { title, year } = getTitleAndYear();
-            const q = `${title} ${year}`.trim();
+            const baseQuery = `${title} ${year}`.trim();
 
-            const data = await browser.storage.local.get(["suffix", "engine"]);
+            try {
+                const data = await browser.storage.local.get(["suffix", "engine", "customSearchUrl"]);
+                const suffix = data.suffix || "watch";
+                const engine = data.engine || "google";
+                const customUrl = data.customSearchUrl || "";
 
-            const suffix = data.suffix || "watch";
-            const engine = data.engine || "google";
-
-            const searchQuery = suffix ? `${q} ${suffix}`.trim() : q;
-
-            let url = "";
-
-            switch (engine) {
-                case "duckduckgo":
-                    url = `https://duckduckgo.com/?q=${encodeURIComponent(searchQuery)}`;
-                    break;
-                default:
-                    url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+                const searchQuery = suffix ? `${baseQuery} ${suffix}`.trim() : baseQuery;
+                const url = buildSearchUrl(searchQuery, engine, customUrl);
+                
+                window.open(url, '_blank');
+            } catch (err) {
+                console.error('Error loading search settings:', err);
+                const url = buildSearchUrl(baseQuery, 'google', '');
+                window.open(url, '_blank');
             }
-        
-            window.open(url, '_blank');
         };
 
         const dropdownBtn = document.createElement('button');
@@ -192,16 +191,13 @@
 
         const btn = createButton();
 
-        // поиск контейнера с кнопками Watchlist/Watched
         const targetContainer = document.querySelector('.ipc-page-content-container--center .sc-51b56837-0') ||
                                document.querySelector('[data-testid="hero-media__watchlist"]') ||
                                document.querySelector('.ipc-split-button.AkkKS');
         
         if (targetContainer && targetContainer.parentElement) {
-            // Вставляем ПЕРЕД контейнером с кнопками
             targetContainer.parentElement.insertBefore(btn, targetContainer);
         } else {
-            // Фоллбэк: ищем правую колонку с кнопками
             const rightColumn = document.querySelector('.sc-51b56837-0')?.parentElement?.parentElement;
             if (rightColumn) {
                 rightColumn.insertBefore(btn, rightColumn.firstChild);
@@ -237,6 +233,7 @@
             position: relative;
             box-shadow: 0 8px 32px rgba(0,0,0,0.6);
             border: 1px solid #333;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         `;
 
         const closeBtn = document.createElement('button');
@@ -259,6 +256,7 @@
             align-items: center;
             justify-content: center;
             transition: background 0.2s;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         `;
         closeBtn.onmouseenter = () => closeBtn.style.background = 'rgba(255,255,255,0.2)';
         closeBtn.onmouseleave = () => closeBtn.style.background = 'rgba(255,255,255,0.1)';
@@ -274,6 +272,7 @@
             display: flex;
             gap: 16px;
             align-items: flex-start;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         `;
 
         if (posterUrl) {
@@ -297,56 +296,114 @@
         const headerText = document.createElement('div');
         headerText.style.flex = '1';
         headerText.innerHTML = `
-            <h3 style="margin: 0 0 8px 0; color: #fff; font-size: 20px; font-weight: 500;">reré: Quick Search</h3>
-            <div style="color: #aaa; font-size: 14px;">${year ? `${title} (${year})` : title}</div>
+            <h3 style="margin: 0 0 8px 0; color: #fff; font-size: 20px; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Quick Search</h3>
+            <div style="color: #aaa; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${year ? `${title} (${year})` : title}</div>
         `;
         header.appendChild(headerText);
 
         const listContainer = document.createElement('div');
         listContainer.style.padding = '8px 0';
+        listContainer.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
         const { title: cleanTitle, year: cleanYear } = getTitleAndYear();
-        const searchQuery = `${cleanTitle} ${cleanYear}`.trim();
+        const baseQuery = `${cleanTitle} ${cleanYear}`.trim();
         
-        const menuItems = [
-            { text: 'Search in new tab (info)', url: `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}` },
-            { text: 'Search in new tab (by title)', url: `https://www.google.com/search?q=${encodeURIComponent(cleanTitle)}` },
-            { text: 'Search YouTube', url: `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTitle)}` },
-            { text: 'Search MyAnimeList', url: `https://myanimelist.net/search/all?q=${encodeURIComponent(searchQuery)}` },
-            { text: 'Search Archive.org', url: `https://archive.org/search?query=${encodeURIComponent(cleanTitle)}` },
-            { text: 'Search Animetosho', url: `https://animetosho.org/search?q=${encodeURIComponent(cleanTitle)}` },
-            { text: 'Search Torrents', url: `https://1337x.to/search/${encodeURIComponent(cleanTitle)}/1/` },
-            { text: 'Search RuTracker', url: `https://rutracker.org/forum/tracker.php?nm=${encodeURIComponent(searchQuery)}` },
-        ];
+        const getMenuItems = async () => {
+            try {
+                const data = await browser.storage.local.get(["suffix", "engine", "customSearchUrl", "customEngines"]);
+                const suffix = data.suffix || "watch";
+                const engine = data.engine || "google";
+                const customUrl = data.customSearchUrl || "";
+                const customEngines = data.customEngines || [];
 
-        menuItems.forEach((item, index) => {
-            const link = document.createElement('a');
-            link.href = '#';
-            link.textContent = item.text;
-            link.style.cssText = `
-                display: block;
-                padding: 14px 24px;
-                color: #fff;
-                text-decoration: none;
-                cursor: pointer;
-                transition: background 0.2s;
-                font-size: 14px;
-            `;
-            link.onmouseenter = () => link.style.background = '#333';
-            link.onmouseleave = () => link.style.background = 'transparent';
-            link.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                closeMenu();
-                window.open(item.url, '_blank');
-            };
-            listContainer.appendChild(link);
-            
-            if (index < menuItems.length - 1) {
-                const divider = document.createElement('div');
-                divider.style.cssText = 'border-top: 1px solid #333;';
-                listContainer.appendChild(divider);
+                const queryWithSuffix = suffix ? `${baseQuery} ${suffix}`.trim() : baseQuery;
+
+                const items = [
+                    { 
+                        text: 'Search in new tab (info)', 
+                        url: buildSearchUrl(queryWithSuffix, engine, customUrl),
+                        isDynamic: true 
+                    },
+                    { 
+                        text: 'Search in new tab (by title)', 
+                        url: buildSearchUrl(cleanTitle, engine, customUrl),
+                        isDynamic: true 
+                    },
+                    { text: 'Search YouTube', url: `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTitle)}` },
+                    { text: 'Search MyAnimeList', url: `https://myanimelist.net/search/all?q=${encodeURIComponent(baseQuery)}` },
+                    { text: 'Search Archive.org', url: `https://archive.org/search?query=${encodeURIComponent(cleanTitle)}` },
+                    { text: 'Search Animetosho', url: `https://animetosho.org/search?q=${encodeURIComponent(cleanTitle)}` },
+                    { text: 'Search Torrents', url: `https://1337x.to/search/${encodeURIComponent(cleanTitle)}/1/` },
+                    { text: 'Search RuTracker', url: `https://rutracker.org/forum/tracker.php?nm=${encodeURIComponent(baseQuery)}` },
+                ];
+
+                if (Array.isArray(customEngines) && customEngines.length > 0) {
+                    items.push({ isDivider: true });
+                    customEngines.forEach((ce, idx) => {
+                        if (ce.name && ce.url && ce.url.includes('{query}')) {
+                            items.push({
+                                text: ce.name,
+                                url: ce.url.replace('{query}', encodeURIComponent(baseQuery)),
+                                isCustom: true
+                            });
+                        }
+                    });
+                }
+
+                return items;
+            } catch (err) {
+                console.error('Error loading menu settings:', err);
+                return [
+                    { text: 'Search in new tab (info)', url: buildSearchUrl(baseQuery, 'google', '') },
+                    { text: 'Search in new tab (by title)', url: buildSearchUrl(cleanTitle, 'google', '') },
+                    { text: 'Search YouTube', url: `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTitle)}` },
+                    { text: 'Search MyAnimeList', url: `https://myanimelist.net/search/all?q=${encodeURIComponent(baseQuery)}` },
+                    { text: 'Search Archive.org', url: `https://archive.org/search?query=${encodeURIComponent(cleanTitle)}` },
+                    { text: 'Search Animetosho', url: `https://animetosho.org/search?q=${encodeURIComponent(cleanTitle)}` },
+                    { text: 'Search Torrents', url: `https://1337x.to/search/${encodeURIComponent(cleanTitle)}/1/` },
+                    { text: 'Search RuTracker', url: `https://rutracker.org/forum/tracker.php?nm=${encodeURIComponent(baseQuery)}` },
+                ];
             }
+        };
+
+        getMenuItems().then(items => {
+            items.forEach((item, index) => {
+                if (item.isDivider) {
+                    const divider = document.createElement('div');
+                    divider.style.cssText = 'border-top: 1px solid #333; margin: 0; width: 100%;';
+                    listContainer.appendChild(divider);
+                    return;
+                }
+
+                const link = document.createElement('a');
+                link.href = '#';
+                link.textContent = item.text;
+                link.style.cssText = `
+                    display: block;
+                    padding: 14px 24px;
+                    color: #fff;
+                    text-decoration: none;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                    font-size: 14px;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                `;
+                link.onmouseenter = () => link.style.background = '#333';
+                link.onmouseleave = () => link.style.background = 'transparent';
+                link.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeMenu();
+                    window.open(item.url, '_blank');
+                };
+                listContainer.appendChild(link);
+                
+                if (index < items.length - 1 && !items[index + 1]?.isDivider) {
+                    const divider = document.createElement('div');
+                    divider.style.cssText = 'border-top: 1px solid #333; margin: 0; width: 100%;';
+                    listContainer.appendChild(divider);
+                }
+            });
         });
 
         modal.appendChild(closeBtn);
@@ -372,7 +429,6 @@
         return overlay;
     }
 
-    // Более надежные селекторы для разных страниц IMDb
     const selectors = [
         '[data-testid="hero-media__watchlist"]',
         '[data-testid="poster-watchlist-ribbon-add"]',
