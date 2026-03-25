@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "reré: IMDb Quick ReSearching",
+  "version": "0.1.1",
+  "description": "Adds convenient search buttons to IMDb.",
+  "permissions": ["tabs", "storage", "activeTab"],
+  "host_permissions": ["*://www.imdb.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://www.imdb.com/title/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

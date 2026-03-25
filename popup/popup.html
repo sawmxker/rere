@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            width: 280px;
+            padding: 16px;
+            font-family: -apple-system, BlinkMacSystemFont, "Helvetica", Roboto, sans-serif;
+            background: #1f1f1f;
+            color: #fff;
+        }
+        h2 {
+            margin: 0 0 16px 0;
+            font-size: 18px;
+            color: #f5c518;
+        }
+        .stats {
+            background: #2c2c2c;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .stat-item:last-child {
+            margin-bottom: 0;
+        }
+        .btn {
+            width: 100%;
+            padding: 10px;
+            background: #f5c518;
+            border: none;
+            border-radius: 20px;
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 8px;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #e2b616;
+        }
+        .btn-secondary {
+            background: #313131;
+            color: #fff;
+        }
+        .btn-secondary:hover {
+            background: #343940;
+        }
+        .current-settings {
+            background: #2a2a2a;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+        .setting-row {
+            margin-bottom: 6px;
+        }
+        .setting-label {
+            color: #aaa;
+        }
+        .setting-value {
+            color: #f5c518;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <h2>reré: IMDb Quick ReSearching</h2>
+    
+    <div class="current-settings">
+        <div class="setting-row">
+            <span class="setting-label">Search Engine:</span>
+            <span class="setting-value" id="currentEngine">reré: Loading...</span>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Suffix:</span>
+            <span class="setting-value" id="currentSuffix">reré: Loading...</span>
+        </div>
+    </div>
+
+    <button class="btn" id="openOptions">Open Settings</button>
+    <button class="btn btn-secondary" id="resetDefaults">Reset to Defaults</button>
+
+    <script src="popup.js"></script>
+</body>
+</html>

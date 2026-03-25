@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>reré: IMDb Quick ReSearching - Settings</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Helvetica", Roboto, sans-serif;
+            background: #121212;
+            color: #fff;
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: #1f1f1f;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        h1 {
+            margin: 0 0 8px 0;
+            color: #f5c518;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #aaa;
+            margin-bottom: 32px;
+            font-size: 14px;
+        }
+        .section {
+            margin-bottom: 32px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid #333;
+        }
+        .section:last-child {
+            border-bottom: none;
+        }
+        h2 {
+            margin: 0 0 16px 0;
+            font-size: 20px;
+            color: #fff;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #ccc;
+        }
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #f5c518;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 6px;
+        }
+        .help-code {
+            background: #1a1a1a;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            color: #f5c518;
+        }
+        .warning-box {
+            background: #2a1f1f;
+            border: 1px solid #de3217;
+            border-radius: 6px;
+            padding: 16px;
+            margin-top: 12px;
+            display: none;
+        }
+        .warning-box.show {
+            display: block;
+        }
+        .warning-title {
+            color: #de3217;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        .warning-item {
+            margin-bottom: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .warning-item strong {
+            color: #ffc199;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .btn {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 22px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #f5c518;
+            color: #000;
+        }
+        .btn-primary:hover {
+            background: #e2b616;
+        }
+        .btn-secondary {
+            background: #313131;
+            color: #fff;
+        }
+        .btn-secondary:hover {
+            background: #343940;
+        }
+        .status {
+            padding: 12px;
+            border-radius: 20px;
+            margin-top: 16px;
+            display: none;
+        }
+        .status.success {
+            background: #192ce0;
+            color: #bdadff;
+            display: block;
+        }
+        .status.error {
+            background: #de3217;
+            color: #ffc199;
+            display: block;
+        }
+        .preview {
+            background: #1a1a1a;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 12px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #b2d367;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>reré: IMDb Quick ReSearching</h1>
+        <div class="subtitle">Customize your search experience</div>
+
+        <div class="section">
+            <h2>Search Configuration</h2>
+            
+            <div class="form-group">
+                <label for="searchEngine">Search Engine</label>
+                <select id="searchEngine">
+                    <option value="google">Google</option>
+                    <option value="duckduckgo">DuckDuckGo</option>
+                    <option value="bing">Bing</option>
+                    <option value="custom">Custom URL</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="suffix">Search Suffix</label>
+                <input type="text" id="suffix" placeholder="watch">
+                <div class="help-text">Text to append to search queries (e.g., "watch", "download", "stream"). Leave empty for no suffix.</div>
+            </div>
+
+            <div class="form-group" id="customUrlGroup" style="display: none;">
+                <label for="customSearchUrl">Custom Search URL</label>
+                <input type="text" id="customSearchUrl" placeholder="https://example.com/search?q={query}">
+                <div class="help-text">Use <span class="help-code">{query}</span> as placeholder for the search term.</div>
+                <div id="urlPreview" class="preview" style="display: none;"></div>
+                
+                <div id="yandexWarning" class="warning-box">
+                    <div class="warning-title">⚠️ Warning: Yandex Search Engine Detected</div>
+                    <div class="warning-item">
+                        <strong>Regional Restrictions:</strong> Search is strictly tied to the region. If you need to find information from another country or in a foreign language, Yandex handles this significantly worse than alternatives.
+                    </div>
+                    <div class="warning-item">
+                        <strong>Censorship and Filtering:</strong> Search results are adjusted in accordance with Russian legislation. Many resources may be completely hidden from the results without the ability to access the site.
+                    </div>
+                    <div class="warning-item">
+                        <strong>Commercialization:</strong> The first few screens in the results for popular queries are often occupied by ads (Direct) and Yandex services. These sites are often unofficial or phishing fake sites. Finding an independent or official website becomes more difficult and less safe.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Quick Links</h2>
+            <div class="help-text">These links will appear in the dropdown menu on IMDb pages.</div>
+            <div style="margin-top: 12px; font-size: 14px; color: #aaa;">
+                • Google Search<br>
+                • YouTube<br>
+                • MyAnimeList<br>
+                • 1337x Torrents<br>
+                • RuTracker<br>
+                • Settings (this page)
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-secondary" id="resetBtn">Reset Defaults</button>
+            <button class="btn btn-primary" id="saveBtn">Save Settings</button>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html>
