@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resetBtn = document.getElementById('resetBtn');
     const status = document.getElementById('status');
     
-    // Custom engines fields
+    // Элементы для управления кастомными поисковиками
     const customEngineNameInput = document.getElementById('customEngineName');
     const customEngineUrlInput = document.getElementById('customEngineUrl');
     const addCustomEngineBtn = document.getElementById('addCustomEngineBtn');
@@ -53,6 +53,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateCustomUrlVisibility();
         updatePreview();
         checkYandexDomain();
+        
+        // Загрузка кастомных поисковиков
         renderCustomEngines(settings.customEngines || []);
     } catch (error) {
         console.error('Error loading settings:', error);
@@ -71,7 +73,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         checkYandexDomain();
     });
 
-    // Add custom engine
+    // Добавление кастомного поисковика
     addCustomEngineBtn.addEventListener('click', async () => {
         const name = customEngineNameInput.value.trim();
         const url = customEngineUrlInput.value.trim();
@@ -96,7 +98,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const customEngines = result.customEngines || [];
             
             customEngines.push({
-                id: Date.now(),
+                id: 'custom_' + Date.now(),
                 name: name,
                 url: url
             });
@@ -158,6 +160,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 3000);
     }
 
+    // Отрисовка списка кастомных поисковиков
     function renderCustomEngines(customEngines) {
         if (!customEnginesList) return;
         

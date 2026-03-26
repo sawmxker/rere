@@ -72,13 +72,16 @@
         }
     }
 
+    // Вспомогательная функция для построения поискового URL
     function buildSearchUrl(query, engine = 'google', customUrl = '') {
         const encodedQuery = encodeURIComponent(query.trim());
         
+        // Если задан кастомный URL - используем его
         if (engine === 'custom' && customUrl && customUrl.includes('{query}')) {
             return customUrl.replace('{query}', encodedQuery);
         }
         
+        // Встроенные движки
         switch (engine) {
             case 'duckduckgo':
                 return `https://duckduckgo.com/?q=${encodedQuery}`;
@@ -119,7 +122,7 @@
         mainBtn.appendChild(icon);
         mainBtn.appendChild(textDiv);
 
-        // ИСПРАВЛЕНО: Основная кнопка теперь правильно читает настройки
+        // Основная кнопка: поиск с учётом настроек из storage
         mainBtn.onclick = async (e) => {
             e.stopPropagation();
             e.preventDefault();
@@ -128,13 +131,25 @@
             const baseQuery = `${title} ${year}`.trim();
 
             try {
-                const data = await browser.storage.local.get(["suffix", "engine", "customSearchUrl"]);
+                // ИСПРАВЛЕНО: убраны пробелы в ключах, исправлены имена ключей
+                const data = await browser.storage.local.get(["suffix", "searchEngine", "customSearchUrl", "customEngines"]);
                 const suffix = data.suffix || "watch";
-                const engine = data.engine || "google";
+                const engine = data.searchEngine || "google";
                 const customUrl = data.customSearchUrl || "";
+                const customEngines = data.customEngines || [];
 
                 const searchQuery = suffix ? `${baseQuery} ${suffix}`.trim() : baseQuery;
-                const url = buildSearchUrl(searchQuery, engine, customUrl);
+                
+                // Проверяем, не является ли это кастомным поисковиком из списка
+                let url = buildSearchUrl(searchQuery, engine, customUrl);
+                
+                // Если это кастомный движок из списка customEngines
+                if (engine.startsWith('custom_')) {
+                    const customEngine = customEngines.find(ce => ce.id === engine);
+                    if (customEngine && customEngine.url) {
+                        url = customEngine.url.replace('{query}', encodeURIComponent(searchQuery));
+                    }
+                }
                 
                 window.open(url, '_blank');
             } catch (err) {
@@ -165,6 +180,7 @@
 
         dropdownBtn.appendChild(arrow);
 
+        // Кнопка меню: открытие модального окна
         dropdownBtn.onclick = (e) => {
             e.stopPropagation();
             e.preventDefault();
@@ -191,6 +207,7 @@
 
         const btn = createButton();
 
+        // Поиск контейнера с кнопками Watchlist/Watched
         const targetContainer = document.querySelector('.ipc-page-content-container--center .sc-51b56837-0') ||
                                document.querySelector('[data-testid="hero-media__watchlist"]') ||
                                document.querySelector('.ipc-split-button.AkkKS');
@@ -308,11 +325,13 @@
         const { title: cleanTitle, year: cleanYear } = getTitleAndYear();
         const baseQuery = `${cleanTitle} ${cleanYear}`.trim();
         
+        // Получаем настройки для пунктов меню
         const getMenuItems = async () => {
             try {
-                const data = await browser.storage.local.get(["suffix", "engine", "customSearchUrl", "customEngines"]);
+                // ИСПРАВЛЕНО: убраны пробелы в ключах
+                const data = await browser.storage.local.get(["suffix", "searchEngine", "customSearchUrl", "customEngines"]);
                 const suffix = data.suffix || "watch";
-                const engine = data.engine || "google";
+                const engine = data.searchEngine || "google";
                 const customUrl = data.customSearchUrl || "";
                 const customEngines = data.customEngines || [];
 
@@ -337,6 +356,7 @@
                     { text: 'Search RuTracker', url: `https://rutracker.org/forum/tracker.php?nm=${encodeURIComponent(baseQuery)}` },
                 ];
 
+                // Добавляем пользовательские поисковики из настроек
                 if (Array.isArray(customEngines) && customEngines.length > 0) {
                     items.push({ isDivider: true });
                     customEngines.forEach((ce, idx) => {
@@ -366,8 +386,10 @@
             }
         };
 
+        // Асинхронное создание пунктов меню
         getMenuItems().then(items => {
             items.forEach((item, index) => {
+                // Разделитель
                 if (item.isDivider) {
                     const divider = document.createElement('div');
                     divider.style.cssText = 'border-top: 1px solid #333; margin: 0; width: 100%;';
