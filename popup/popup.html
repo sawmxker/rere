@@ -15,21 +15,6 @@
             font-size: 18px;
             color: #f5c518;
         }
-        .stats {
-            background: #2c2c2c;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 16px;
-        }
-        .stat-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-        .stat-item:last-child {
-            margin-bottom: 0;
-        }
         .btn {
             width: 100%;
             padding: 10px;
@@ -62,6 +47,9 @@
         .setting-row {
             margin-bottom: 6px;
         }
+        .setting-row:last-child {
+            margin-bottom: 0;
+        }
         .setting-label {
             color: #aaa;
         }
@@ -72,16 +60,20 @@
     </style>
 </head>
 <body>
-    <h2>reré: IMDb Quick ReSearching</h2>
-    
+    <h2>rere: IMDb Quick ReSearching</h2>
+
     <div class="current-settings">
         <div class="setting-row">
             <span class="setting-label">Search Engine:</span>
-            <span class="setting-value" id="currentEngine">reré: Loading...</span>
+            <span class="setting-value" id="currentEngine">Loading...</span>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Query Template:</span>
+            <span class="setting-value" id="currentQueryMode">Loading...</span>
         </div>
         <div class="setting-row">
             <span class="setting-label">Suffix:</span>
-            <span class="setting-value" id="currentSuffix">reré: Loading...</span>
+            <span class="setting-value" id="currentSuffix">Loading...</span>
         </div>
     </div>
 

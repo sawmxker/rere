@@ -2,117 +2,314 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>reré: IMDb Quick ReSearching - Settings</title>
+    <title>rere: IMDb Quick ReSearching - Settings</title>
     <style>
         * {
             box-sizing: border-box;
         }
+
+        :root {
+            color-scheme: dark;
+            --bg: #121212;
+            --panel: #1f1f1f;
+            --panel-soft: #262626;
+            --panel-muted: #1a1a1a;
+            --border: #333;
+            --border-strong: #444;
+            --text: #fff;
+            --text-muted: #aaa;
+            --accent: #f5c518;
+            --accent-hover: #e2b616;
+            --danger: #de3217;
+            --danger-soft: #2a1f1f;
+            --success-bg: #192ce0;
+            --success-text: #bdadff;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Helvetica", Roboto, sans-serif;
-            background: #121212;
-            color: #fff;
+            background: var(--bg);
+            color: var(--text);
             margin: 0;
             padding: 40px 20px;
             line-height: 1.6;
         }
+
         .container {
-            max-width: 700px;
+            max-width: 980px;
             margin: 0 auto;
-            background: #1f1f1f;
+            background: var(--panel);
             padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .page-header img {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            flex-shrink: 0;
+        }
+
         h1 {
-            margin: 0 0 8px 0;
-            color: #f5c518;
+            margin: 0 0 6px 0;
+            color: var(--accent);
             font-size: 28px;
         }
+
         .subtitle {
-            color: #aaa;
-            margin-bottom: 32px;
+            color: var(--text-muted);
             font-size: 14px;
         }
+
         .section {
             margin-bottom: 32px;
             padding-bottom: 32px;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--border);
         }
+
         .section:last-child {
             border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
         }
+
         h2 {
-            margin: 0 0 16px 0;
+            margin: 0 0 8px 0;
             font-size: 20px;
-            color: #fff;
+            color: var(--text);
         }
+
+        .section-description {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 18px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
+
         label {
             display: block;
             margin-bottom: 6px;
             font-weight: 500;
             color: #ccc;
         }
+
         input[type="text"],
         select {
             width: 100%;
             padding: 10px 12px;
-            background: #1a1a1a;
-            border: 1px solid #444;
-            border-radius: 4px;
-            color: #fff;
+            background: var(--panel-muted);
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            color: var(--text);
             font-size: 14px;
             transition: border-color 0.2s;
         }
+
         input[type="text"]:focus,
         select:focus {
             outline: none;
-            border-color: #f5c518;
+            border-color: var(--accent);
         }
+
         .help-text {
             font-size: 12px;
             color: #888;
             margin-top: 6px;
         }
+
         .help-code {
-            background: #1a1a1a;
+            background: var(--panel-muted);
             padding: 2px 6px;
-            border-radius: 3px;
+            border-radius: 4px;
             font-family: monospace;
-            color: #f5c518;
+            color: var(--accent);
         }
+
+        .preview {
+            background: var(--panel-muted);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #b2d367;
+            word-break: break-all;
+        }
+
         .warning-box {
-            background: #2a1f1f;
-            border: 1px solid #de3217;
-            border-radius: 6px;
+            background: var(--danger-soft);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
             padding: 16px;
             margin-top: 12px;
             display: none;
         }
+
         .warning-box.show {
             display: block;
         }
+
         .warning-title {
-            color: #de3217;
+            color: var(--danger);
             font-weight: 600;
             margin-bottom: 12px;
             font-size: 15px;
         }
+
         .warning-item {
             margin-bottom: 10px;
             font-size: 13px;
             line-height: 1.5;
         }
+
+        .warning-item:last-child {
+            margin-bottom: 0;
+        }
+
         .warning-item strong {
             color: #ffc199;
         }
+
+        .engine-card {
+            background: var(--panel-soft);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+
+        .engine-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .engine-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .engine-title-text {
+            min-width: 0;
+        }
+
+        .engine-title-name {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .engine-title-url {
+            color: #888;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 360px;
+        }
+
+        .engine-icon,
+        .engine-icon-fallback {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+
+        .engine-icon-fallback {
+            background: #3a3a3a;
+            color: #ddd;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .engine-badge {
+            background: rgba(245, 197, 24, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(245, 197, 24, 0.4);
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .engine-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .mini-btn {
+            background: #313131;
+            color: var(--text);
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            padding: 7px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .mini-btn:hover {
+            background: #3a3a3a;
+        }
+
+        .mini-btn-danger {
+            background: rgba(222, 50, 23, 0.12);
+            color: #ffc199;
+            border-color: rgba(222, 50, 23, 0.55);
+        }
+
+        .engine-fields {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        .engine-fields .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .builder-box {
+            background: var(--panel-soft);
+            border: 1px dashed var(--border-strong);
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 18px;
+        }
+
         .btn-group {
             display: flex;
             gap: 12px;
             margin-top: 24px;
         }
+
         .btn {
             flex: 1;
             padding: 12px 24px;
@@ -123,146 +320,173 @@
             cursor: pointer;
             transition: all 0.2s;
         }
+
         .btn-primary {
-            background: #f5c518;
+            background: var(--accent);
             color: #000;
         }
+
         .btn-primary:hover {
-            background: #e2b616;
+            background: var(--accent-hover);
         }
+
         .btn-secondary {
             background: #313131;
-            color: #fff;
+            color: var(--text);
         }
+
         .btn-secondary:hover {
             background: #343940;
         }
+
         .status {
             padding: 12px;
             border-radius: 20px;
             margin-top: 16px;
             display: none;
         }
+
         .status.success {
-            background: #192ce0;
-            color: #bdadff;
+            background: var(--success-bg);
+            color: var(--success-text);
             display: block;
         }
+
         .status.error {
-            background: #de3217;
+            background: var(--danger);
             color: #ffc199;
             display: block;
         }
-        .preview {
-            background: #1a1a1a;
+
+        .empty-state {
+            color: #888;
             padding: 12px;
-            border-radius: 4px;
-            margin-top: 12px;
-            font-family: monospace;
-            font-size: 13px;
-            color: #b2d367;
-            word-break: break-all;
+            background: var(--panel-soft);
+            border-radius: 10px;
         }
-        .custom-engine-input {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-        .add-engine-btn {
-            background: #f5c518;
-            color: #000;
-            border: none;
-            border-radius: 4px;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-weight: 600;
-            align-self: flex-start;
-        }
-        .add-engine-btn:hover {
-            background: #e2b616;
-        }
-        #customEnginesList {
-            margin-top: 16px;
+
+        @media (max-width: 720px) {
+            body {
+                padding: 20px 12px;
+            }
+
+            .container {
+                padding: 24px 18px;
+            }
+
+            .page-header {
+                align-items: flex-start;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>reré: IMDb Quick ReSearching</h1>
-        <div class="subtitle">Customize your search experience</div>
+        <div class="page-header">
+            <img src="../icons/icon48.png" alt="rere icon">
+            <div>
+                <h1>rere: IMDb Quick ReSearching</h1>
+                <div class="subtitle">Customize default engines, quick menu items, query templates, and site favicons.</div>
+            </div>
+        </div>
 
         <div class="section">
             <h2>Search Configuration</h2>
-            
-            <div class="form-group">
-                <label for="searchEngine">Search Engine</label>
-                <select id="searchEngine">
-                    <option value="google">Google</option>
-                    <option value="duckduckgo">DuckDuckGo</option>
-                    <option value="bing">Bing</option>
-                    <option value="custom">Custom URL</option>
-                </select>
+            <div class="section-description">Choose the default engine, how the query is built, and an optional suffix like "watch" or "stream".</div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="searchEngine">Default Search Engine</label>
+                    <select id="searchEngine"></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="searchQueryMode">Query Template</label>
+                    <select id="searchQueryMode">
+                        <option value="title">title</option>
+                        <option value="titleYear">title+year</option>
+                    </select>
+                </div>
             </div>
 
             <div class="form-group">
                 <label for="suffix">Search Suffix</label>
                 <input type="text" id="suffix" placeholder="watch">
-                <div class="help-text">Text to append to search queries (e.g., "watch", "download", "stream"). Leave empty for no suffix.</div>
+                <div class="help-text">Optional text added after the selected query template. Example: <span class="help-code">title+year + watch</span>.</div>
             </div>
 
-            <div class="form-group" id="customUrlGroup" style="display: none;">
-                <label for="customSearchUrl">Custom Search URL</label>
-                <input type="text" id="customSearchUrl" placeholder="https://example.com/search?q={query}">
-                <div class="help-text">Use <span class="help-code">{query}</span> as placeholder for the search term.</div>
-                <div id="urlPreview" class="preview" style="display: none;"></div>
-                
-                <div id="yandexWarning" class="warning-box">
-                    <div class="warning-title">⚠️ Warning: Yandex Search Engine Detected</div>
-                    <div class="warning-item">
-                        <strong>Regional Restrictions:</strong> Search is strictly tied to the region. If you need to find information from another country or in a foreign language, Yandex handles this significantly worse than alternatives.
+            <div id="searchPreview" class="preview"></div>
+            <div id="searchYandexWarning" class="warning-box"></div>
+        </div>
+
+        <div class="section">
+            <h2>Default Search Engines</h2>
+            <div class="section-description">These engines appear in the main search selector. You can add your own, reorder them, edit them, or remove built-in ones too.</div>
+
+            <div class="builder-box">
+                <div class="engine-fields">
+                    <div>
+                        <label for="defaultEngineName">Search Engine Name</label>
+                        <input type="text" id="defaultEngineName" placeholder="e.g. Startpage">
                     </div>
-                    <div class="warning-item">
-                        <strong>Censorship and Filtering:</strong> Search results are adjusted in accordance with Russian legislation. Many resources may be completely hidden from the results without the ability to access the site.
-                    </div>
-                    <div class="warning-item">
-                        <strong>Commercialization:</strong> The first few screens in the results for popular queries are often occupied by ads (Direct) and Yandex services. These sites are often unofficial or phishing fake sites. Finding an independent or official website becomes more difficult and less safe.
+
+                    <div class="full-width">
+                        <label for="defaultEngineUrl">Search URL</label>
+                        <input type="text" id="defaultEngineUrl" placeholder="https://example.com/search?q=">
+                        <div class="help-text">Examples: <span class="help-code">https://example.com/search?q=</span> or <span class="help-code">https://example.com/search?q={query}</span>.</div>
                     </div>
                 </div>
+
+                <button type="button" id="addDefaultEngineBtn" class="mini-btn" style="margin-top: 16px;">Add Default Search Engine</button>
+                <div id="defaultBuilderPreview" class="preview" style="margin-top: 16px;"></div>
+                <div id="defaultBuilderWarning" class="warning-box"></div>
             </div>
+
+            <div id="defaultEnginesList"></div>
+        </div>
+
+        <div class="section">
+            <h2>Quick Search Menu Items</h2>
+            <div class="section-description">These are the standard IMDb quick-menu entries like YouTube, RuTracker, and the two built-in "Search in new tab" actions. You can rename them, edit URLs, change query template, reorder, or delete them.</div>
+            <div id="menuItemsList"></div>
         </div>
 
         <div class="section">
             <h2>Custom Search Engines</h2>
-            <div class="help-text">Add custom search engines that will appear in the dropdown menu on IMDb pages.</div>
-            
-            <div class="custom-engine-input">
-                <div>
-                    <label for="customEngineName">Search Engine Name</label>
-                    <input type="text" id="customEngineName" placeholder="e.g., Google Movies">
-                </div>
-                <div>
-                    <label for="customEngineUrl">Search URL</label>
-                    <input type="text" id="customEngineUrl" placeholder="https://example.com/search?q={query}">
-                    <div class="help-text">Use <span class="help-code">{query}</span> as placeholder for the search term.</div>
-                </div>
-                <button type="button" id="addCustomEngineBtn" class="add-engine-btn">Add Search Engine</button>
-            </div>
-            
-            <div id="customEnginesList"></div>
-        </div>
+            <div class="section-description">These additional engines appear in the IMDb quick-search menu after the standard items.</div>
 
-        <div class="section">
-            <h2>Quick Links</h2>
-            <div class="help-text">These links will appear in the dropdown menu on IMDb pages.</div>
-            <div style="margin-top: 12px; font-size: 14px; color: #aaa;">
-                • Google Search<br>
-                • YouTube<br>
-                • MyAnimeList<br>
-                • 1337x Torrents<br>
-                • RuTracker<br>
-                • Settings (this page)
+            <div class="builder-box">
+                <div class="engine-fields">
+                    <div>
+                        <label for="customEngineName">Search Engine Name</label>
+                        <input type="text" id="customEngineName" placeholder="e.g. Letterboxd">
+                    </div>
+
+                    <div>
+                        <label for="customEngineQueryMode">Query Template</label>
+                        <select id="customEngineQueryMode">
+                            <option value="title">title</option>
+                            <option value="titleYear">title+year</option>
+                        </select>
+                    </div>
+
+                    <div class="full-width">
+                        <label for="customEngineUrl">Search URL</label>
+                        <input type="text" id="customEngineUrl" placeholder="https://example.com/search?q=">
+                        <div class="help-text">Examples: <span class="help-code">https://example.com/search?q=</span> or <span class="help-code">https://example.com/search?q={query}</span>.</div>
+                    </div>
+                </div>
+
+                <button type="button" id="addCustomEngineBtn" class="mini-btn" style="margin-top: 16px;">Add Search Engine</button>
+                <div id="customBuilderPreview" class="preview" style="margin-top: 16px;"></div>
+                <div id="customBuilderWarning" class="warning-box"></div>
             </div>
+
+            <div id="customEnginesList"></div>
         </div>
 
         <div class="btn-group">
