@@ -9,10 +9,10 @@ const DEFAULT_MENU_ITEMS = [
     { id: "menu_info", name: "Search in new tab (info)", url: "__DEFAULT_ENGINE__", queryMode: "configured", builtIn: true, usesSelectedEngine: true },
     { id: "menu_title", name: "Search in new tab (by title)", url: "__DEFAULT_ENGINE__", queryMode: "title", builtIn: true, usesSelectedEngine: true },
     { id: "menu_youtube", name: "Search YouTube", url: "https://www.youtube.com/results?search_query={query}", queryMode: "title", builtIn: true },
-    { id: "menu_mal", name: "Search MyAnimeList", url: "https://myanimelist.net/search/all?q={query}", queryMode: "titleYear", builtIn: true },
+    { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true },
+    { id: 'menu_mal_visit', name: 'Visit MyAnimeList page', url: 'https://www.google.com/search?q=site:myanimelist.net+{query}&btnI', queryMode: 'titleYear', builtIn: true },
     { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?query={query}", queryMode: "title", builtIn: true },
     { id: "menu_animetosho", name: "Search Animetosho", url: "https://animetosho.org/search?q={query}", queryMode: "title", builtIn: true },
-    { id: "menu_torrents", name: "Search Torrents", url: "https://1337x.to/search/{query}/1/", queryMode: "title", builtIn: true },
     { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "titleYear", builtIn: true }
 ];
 
@@ -99,6 +99,10 @@ function getOriginFromUrl(url) {
 }
 
 function getFaviconUrl(url) {
+    if (url.includes("myanimelist.net")) {
+        return "https://myanimelist.net/favicon.ico";
+    }
+
     const origin = getOriginFromUrl(url);
     return origin ? `${origin}/favicon.ico` : "";
 }
@@ -451,7 +455,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         urlInput.addEventListener("input", () => { engine.url = urlInput.value; render(); });
         const help = document.createElement("div");
         help.className = "help-text";
-        help.textContent = "If {query} is missing, it will be appended automatically.";
+        help.textContent = "If {query} is missing, it will be appended automatically. This may cause errors with non-standard search links.";
         urlWrap.appendChild(urlInput);
         urlWrap.appendChild(help);
         fields.appendChild(nameWrap);
@@ -519,7 +523,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         help.className = "help-text";
         help.textContent = item.usesSelectedEngine
             ? "Currently follows the selected Default Search Engine. Editing this field will detach it and use your custom URL."
-            : "If {query} is missing, it will be appended automatically.";
+            : "If {query} is missing, it will be appended automatically. This may cause errors with non-standard search links.";
         urlWrap.appendChild(urlInput);
         urlWrap.appendChild(help);
         fields.appendChild(nameWrap);
@@ -578,7 +582,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         urlInput.addEventListener("input", () => { item.url = urlInput.value; render(); });
         const help = document.createElement("div");
         help.className = "help-text";
-        help.textContent = "If {query} is missing, it will be appended automatically.";
+        help.textContent = "If {query} is missing, it will be appended automatically. This may cause errors with non-standard search links.";
         urlWrap.appendChild(urlInput);
         urlWrap.appendChild(help);
         fields.appendChild(nameWrap);

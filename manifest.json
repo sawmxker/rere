@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "reré: IMDb Quick ReSearching",
-  "version": "0.1.11",
+  "version": "0.1.16",
   "description": "Adds convenient search buttons to IMDb.",
 
   "permissions": ["tabs", "storage", "activeTab"],
