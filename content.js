@@ -143,10 +143,46 @@
         return ensureQueryPlaceholder(targetUrl).replace('{query}', encodeURIComponent(query));
     }
 
+    function extractTargetDomainFromQuery(url) {
+    try {
+        const testUrl = url.replace("{query}", "test");
+        const parsed = new URL(testUrl);
+        const queryParams = new URLSearchParams(parsed.search);
+        
+        for (const param of ['q', 'query', 'p', 's']) {
+            const value = queryParams.get(param);
+            if (!value) continue;
+            const siteMatch = value.match(/site:([^+\s&]+)/i);
+            if (siteMatch && siteMatch[1]) {
+                return siteMatch[1];
+            }
+            const domainMatch = value.match(/(https?:\/\/)?(www\.)?([a-zA-Z0-9-]+\.[a-zA-Z.]{2,})/);
+            if (domainMatch && domainMatch[3]) {
+                const domain = domainMatch[3].toLowerCase();
+                const searchDomains = ['google.com', 'duckduckgo.com', 'bing.com', 'yandex.ru', 'yahoo.com'];
+                if (!searchDomains.some(sd => domain.endsWith(sd))) {
+                    return domain;
+                }
+            }
+        }
+    } catch (e) {
+    }
+    return null;
+}
+
     function getFaviconUrl(url, settings) {
-        const targetUrl = url === '__DEFAULT_ENGINE__' ? getSelectedEngine(settings)?.url : url;
+        const targetUrl = url === '__DEFAULT_ENGINE__' 
+            ? getSelectedEngine(settings)?.url 
+            : url;
+
+        if (!targetUrl) return '';
+        const targetDomain = extractTargetDomainFromQuery(targetUrl);
+        if (targetDomain) {
+            const protocol = targetUrl.startsWith('https://') ? 'https:' : 'http:';
+            return `${protocol}//${targetDomain}/favicon.ico`;
+        }
         try {
-            const parsed = new URL((targetUrl || '').replace('{query}', 'test'));
+            const parsed = new URL(targetUrl.replace('{query}', 'test'));
             return `${parsed.origin}/favicon.ico`;
         } catch (error) {
             return '';
