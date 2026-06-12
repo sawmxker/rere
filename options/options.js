@@ -10,9 +10,7 @@ const DEFAULT_MENU_ITEMS = [
     { id: "menu_title", name: "Search in new tab (by title)", url: "__DEFAULT_ENGINE__", queryMode: "title", builtIn: true, usesSelectedEngine: true },
     { id: "menu_youtube", name: "Search YouTube", url: "https://www.youtube.com/results?search_query={query}", queryMode: "title", builtIn: true },
     { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true },
-    { id: 'menu_mal_visit', name: 'Visit MyAnimeList page', url: 'https://www.google.com/search?q=site:myanimelist.net+{query}&btnI', queryMode: 'titleYear', builtIn: true },
     { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?query={query}", queryMode: "title", builtIn: true },
-    { id: "menu_animetosho", name: "Search Animetosho", url: "https://animetosho.org/search?q={query}", queryMode: "title", builtIn: true },
     { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "titleYear", builtIn: true }
 ];
 
@@ -36,6 +34,7 @@ const YANDEX_DOMAINS = [
 ];
 
 let state = createDefaultState();
+let isDirty = false;
 
 function createDefaultState() {
     return {
@@ -324,6 +323,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const defaultBuilderWarning = document.getElementById("defaultBuilderWarning");
     const defaultEnginesList = document.getElementById("defaultEnginesList");
 
+    const pickFromMenuBtn = document.getElementById("pickFromMenuBtn");
+    const menuPickerModal = document.getElementById("menuPickerModal");
+    const pickerList = document.getElementById("pickerList");
+    const pickerCloseBtn = document.getElementById("pickerCloseBtn");
+
     const menuItemsList = document.getElementById("menuItemsList");
 
     const customEngineNameInput = document.getElementById("customEngineName");
@@ -332,7 +336,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const addCustomEngineBtn = document.getElementById("addCustomEngineBtn");
     const customBuilderPreview = document.getElementById("customBuilderPreview");
     const customBuilderWarning = document.getElementById("customBuilderWarning");
-    const customEnginesList = document.getElementById("customEnginesList");
+    const scrollToAddBtn = document.getElementById("scrollToAddBtn");
 
     function showStatus(message, type) {
         status.textContent = message;
@@ -650,40 +654,44 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function renderMenuItems() {
         menuItemsList.innerHTML = "";
-        if (state.menuItems.length === 0) {
-            menuItemsList.innerHTML = `<div class="empty-state">No quick search menu items.</div>`;
+        const allItems = [...state.menuItems, ...state.customEngines];
+        if (allItems.length === 0) {
+            menuItemsList.innerHTML = `<div class="empty-state">No quick search menu items yet.</div>`;
             return;
         }
         state.menuItems.forEach((item, index) => menuItemsList.appendChild(createMenuItemCard(item, index)));
+        if (state.customEngines.length > 0) {
+            state.customEngines.forEach((item, index) => menuItemsList.appendChild(createCustomEngineCard(item, index)));
+        }
     }
 
-    function renderCustomEngines() {
-        customEnginesList.innerHTML = "";
-        if (state.customEngines.length === 0) {
-            customEnginesList.innerHTML = `<div class="empty-state">No custom search engines yet.</div>`;
-            return;
-        }
-        state.customEngines.forEach((item, index) => customEnginesList.appendChild(createCustomEngineCard(item, index)));
+    function updateSaveButtonState() {
+        saveBtn.classList.toggle('btn-unsaved', isDirty);
     }
 
     function render() {
+        isDirty = true;
         updateEngineSelect();
         searchQueryModeSelect.value = state.searchQueryMode;
         suffixInput.value = state.suffix;
         renderDefaultEngines();
         renderMenuItems();
-        renderCustomEngines();
         updateSearchPreview();
         updateBuilderPreview();
+        updateSaveButtonState();
     }
 
     try {
         state = normalizeSettings(await browser.storage.local.get(null));
         render();
+        isDirty = false;
+        updateSaveButtonState();
     } catch (error) {
         console.error("Error loading settings:", error);
         showStatus("Error loading settings", "error");
         render();
+        isDirty = false;
+        updateSaveButtonState();
     }
 
     engineSelect.addEventListener("change", () => {
@@ -693,11 +701,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     searchQueryModeSelect.addEventListener("change", () => {
         state.searchQueryMode = searchQueryModeSelect.value;
+        isDirty = true;
+        updateSaveButtonState();
         updateSearchPreview();
     });
 
     suffixInput.addEventListener("input", () => {
         state.suffix = suffixInput.value;
+        isDirty = true;
+        updateSaveButtonState();
         updateSearchPreview();
     });
 
@@ -742,6 +754,54 @@ document.addEventListener("DOMContentLoaded", async () => {
         render();
         showStatus("Search engine added to the draft list", "success");
     });
+
+    scrollToAddBtn.addEventListener("click", () => {
+        document.getElementById("addForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    function populatePicker() {
+        pickerList.innerHTML = "";
+        const allItems = [...state.menuItems, ...state.customEngines];
+        if (allItems.length === 0) {
+            pickerList.innerHTML = '<div class="empty-state">No menu items yet.</div>';
+            return;
+        }
+        allItems.forEach((item) => {
+            const el = document.createElement("div");
+            el.className = "picker-item";
+            const url = item.usesSelectedEngine
+                ? (getSearchEngineById(state.searchEngineId)?.url || item.url)
+                : item.url;
+            el.appendChild(createFaviconElement(url, item.name));
+            const textWrap = document.createElement("div");
+            textWrap.style.minWidth = "0";
+            textWrap.innerHTML = `<div class="picker-item-name">${item.name}</div><div class="picker-item-url">${url}</div>`;
+            el.appendChild(textWrap);
+            el.addEventListener("click", () => {
+                defaultEngineNameInput.value = item.name;
+                defaultEngineUrlInput.value = url;
+                updateBuilderPreview();
+                menuPickerModal.classList.remove("show");
+            });
+            pickerList.appendChild(el);
+        });
+    }
+
+    pickFromMenuBtn.addEventListener("click", () => {
+        populatePicker();
+        menuPickerModal.classList.add("show");
+    });
+
+    pickerCloseBtn.addEventListener("click", () => {
+        menuPickerModal.classList.remove("show");
+    });
+
+    menuPickerModal.addEventListener("click", (e) => {
+        if (e.target === menuPickerModal) {
+            menuPickerModal.classList.remove("show");
+        }
+    });
+
     saveBtn.addEventListener("click", async () => {
         state.suffix = suffixInput.value.trim();
         state.searchEngineId = engineSelect.value;
@@ -772,6 +832,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             await browser.storage.local.set(serializeSettings());
             showStatus("Settings saved successfully!", "success");
             render();
+            isDirty = false;
+            updateSaveButtonState();
         } catch (error) {
             console.error("Error saving settings:", error);
             showStatus("Error saving settings", "error");
@@ -792,6 +854,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             customEngineUrlInput.value = "";
             customEngineQueryModeSelect.value = "titleYear";
             render();
+            isDirty = false;
+            updateSaveButtonState();
             showStatus("Settings reset to defaults", "success");
         } catch (error) {
             console.error("Error resetting settings:", error);

@@ -294,13 +294,21 @@
     function addButton() {
         if (document.querySelector('#imdb-search-btn')) return;
         const btn = createButton();
-        const targetContainer = document.querySelector('.ipc-page-content-container--center .sc-51b56837-0') ||
-            document.querySelector('[data-testid="hero-media__watchlist"]') ||
-            document.querySelector('.ipc-split-button.AkkKS');
+        const wlBtn = document.querySelector('[data-testid="tm-box-wl-button"]');
+        if (wlBtn) {
+            const container = wlBtn.closest('.sc-dcb1530e-3') || wlBtn.parentElement?.parentElement;
+            if (container) {
+                container.insertBefore(btn, container.firstChild);
+                return;
+            }
+        }
+        const targetContainer = document.querySelector('.sc-dcb1530e-3') ||
+            document.querySelector('.ipc-split-button.ipc-btn--theme-baseAlt');
         if (targetContainer && targetContainer.parentElement) {
             targetContainer.parentElement.insertBefore(btn, targetContainer);
         } else {
-            const rightColumn = document.querySelector('.sc-51b56837-0')?.parentElement?.parentElement;
+            const rightColumn = document.querySelector('[data-testid="hero-parent"] .sc-89427c75-12') ||
+                document.querySelector('.ipc-page-content-container--center > div:last-child');
             if (rightColumn) {
                 rightColumn.insertBefore(btn, rightColumn.firstChild);
             }
@@ -444,13 +452,13 @@
     }
 
     const selectors = [
-        '[data-testid="hero-media__watchlist"]',
+        '[data-testid="tm-box-wl-button"]',
         '[data-testid="poster-watchlist-ribbon-add"]',
         '.ipc-watchlist-ribbon',
-        '[data-testid="tm-box-wl-button"]',
         'button[aria-label*="Watchlist"]',
         'button[aria-label*="watchlist"]',
-        '.sc-51b56837-0'
+        '.sc-dcb1530e-3',
+        '.ipc-split-button.ipc-btn--theme-baseAlt'
     ];
 
     function tryAddButton() {
