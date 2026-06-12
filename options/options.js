@@ -30,7 +30,8 @@ const YANDEX_DOMAINS = [
     "yandex.kz",
     "yandex.ua",
     "yandex.com.tr",
-    "ya.ru"
+    "ya.ru",
+    "kinopoisk.ru"
 ];
 
 let state = createDefaultState();
@@ -500,9 +501,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         fields.appendChild(nameWrap);
         fields.appendChild(urlWrap);
 
-        const preview = document.createElement("div");
-        preview.className = "preview";
-        preview.textContent = `Example: ${buildSearchUrl(engine.url, state.searchQueryMode, state.suffix)}`;
         const warning = document.createElement("div");
         warning.className = `warning-box${isYandexUrl(engine.url) ? " show" : ""}`;
         if (isYandexUrl(engine.url)) {
@@ -510,7 +508,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         card.appendChild(header);
         card.appendChild(fields);
-        card.appendChild(preview);
         card.appendChild(warning);
         return card;
     }
@@ -569,9 +566,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         fields.appendChild(queryWrap);
         fields.appendChild(urlWrap);
 
-        const preview = document.createElement("div");
-        preview.className = "preview";
-        preview.textContent = `Example: ${buildSearchUrl(item.url, item.queryMode, item.queryMode === "configured" ? state.suffix : "")}`;
         const warning = document.createElement("div");
         const shouldWarn = !item.usesSelectedEngine && isYandexUrl(item.url);
         warning.className = `warning-box${shouldWarn ? " show" : ""}`;
@@ -580,7 +574,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         card.appendChild(header);
         card.appendChild(fields);
-        card.appendChild(preview);
         card.appendChild(warning);
         return card;
     }
@@ -628,9 +621,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         fields.appendChild(queryWrap);
         fields.appendChild(urlWrap);
 
-        const preview = document.createElement("div");
-        preview.className = "preview";
-        preview.textContent = `Example: ${buildSearchUrl(item.url, item.queryMode, "")}`;
         const warning = document.createElement("div");
         warning.className = `warning-box${isYandexUrl(item.url) ? " show" : ""}`;
         if (isYandexUrl(item.url)) {
@@ -638,7 +628,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         card.appendChild(header);
         card.appendChild(fields);
-        card.appendChild(preview);
         card.appendChild(warning);
         return card;
     }
