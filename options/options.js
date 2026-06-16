@@ -142,6 +142,30 @@ function getFaviconUrl(url) {
     }
 }
 
+function extractDomainsFromUrl(url) {
+    const domains = [];
+    try {
+        const testUrl = url.replace("{query}", "test");
+        const parsed = new URL(testUrl);
+        const mainDomain = parsed.hostname.replace(/^www\./, "");
+        if (mainDomain) domains.push(mainDomain);
+        const queryParams = new URLSearchParams(parsed.search);
+        for (const [, value] of queryParams) {
+            const siteMatch = value.match(/site:([^+\s&]+)/i);
+            if (siteMatch && siteMatch[1]) {
+                const d = siteMatch[1].replace(/^www\./, "").toLowerCase();
+                if (!domains.includes(d)) domains.push(d);
+            }
+            const urlMatches = value.matchAll(/(https?:\/\/)?(www\.)?([a-zA-Z0-9-]+\.[a-zA-Z.]{2,})/g);
+            for (const match of urlMatches) {
+                const d = match[3].toLowerCase().replace(/^www\./, "");
+                if (!domains.includes(d)) domains.push(d);
+            }
+        }
+    } catch (e) {}
+    return domains;
+}
+
 function isYandexUrl(url) {
     const lower = (url || "").toLowerCase();
     return YANDEX_DOMAINS.some((domain) => lower.includes(domain));
@@ -190,7 +214,8 @@ function normalizeMenuItem(raw, fallback = {}) {
         url: url === "__DEFAULT_ENGINE__" ? "__DEFAULT_ENGINE__" : ensureQueryPlaceholder(url),
         queryMode: normalizeQueryMode(raw?.queryMode, fallback.queryMode || "titleYear"),
         builtIn: Boolean(raw?.builtIn ?? fallback.builtIn),
-        usesSelectedEngine: url === "__DEFAULT_ENGINE__" || Boolean(raw?.usesSelectedEngine ?? fallback.usesSelectedEngine)
+        usesSelectedEngine: url === "__DEFAULT_ENGINE__" || Boolean(raw?.usesSelectedEngine ?? fallback.usesSelectedEngine),
+        iconUrl: raw?.iconUrl || ""
     };
 }
 
@@ -199,7 +224,8 @@ function normalizeCustomEngine(raw) {
         id: raw?.id || makeId("custom"),
         name: (raw?.name || "Custom Search").trim(),
         url: ensureQueryPlaceholder(raw?.url || ""),
-        queryMode: normalizeQueryMode(raw?.queryMode, "titleYear")
+        queryMode: normalizeQueryMode(raw?.queryMode, "titleYear"),
+        iconUrl: raw?.iconUrl || ""
     };
 }
 function normalizeSettings(raw) {
@@ -259,13 +285,15 @@ function serializeSettings() {
             url: item.usesSelectedEngine ? "__DEFAULT_ENGINE__" : ensureQueryPlaceholder(item.url),
             queryMode: normalizeQueryMode(item.queryMode),
             builtIn: Boolean(item.builtIn),
-            usesSelectedEngine: Boolean(item.usesSelectedEngine)
+            usesSelectedEngine: Boolean(item.usesSelectedEngine),
+            iconUrl: item.iconUrl || ""
         })),
         customEngines: state.customEngines.map((item) => ({
             id: item.id,
             name: item.name.trim(),
             url: ensureQueryPlaceholder(item.url),
-            queryMode: normalizeQueryMode(item.queryMode)
+            queryMode: normalizeQueryMode(item.queryMode),
+            iconUrl: item.iconUrl || ""
         })),
         customSearchUrl: ""
     };
@@ -338,6 +366,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     const customBuilderPreview = document.getElementById("customBuilderPreview");
     const customBuilderWarning = document.getElementById("customBuilderWarning");
     const scrollToAddBtn = document.getElementById("scrollToAddBtn");
+    const defaultEnginesSection = document.getElementById("defaultEnginesSection");
+    const defaultEnginesHeader = document.getElementById("defaultEnginesHeader");
+    const defaultEnginesBody = document.getElementById("defaultEnginesBody");
+    const menuItemsSection = document.getElementById("menuItemsSection");
+    const menuItemsHeader = document.getElementById("menuItemsHeader");
+    const menuItemsBody = document.getElementById("menuItemsBody");
+
+    function animateToggle(section, body) {
+        if (section.classList.contains("collapsed")) {
+            body.style.maxHeight = body.scrollHeight + "px";
+            section.classList.remove("collapsed");
+            const onEnd = () => {
+                body.style.maxHeight = "";
+                body.removeEventListener("transitionend", onEnd);
+            };
+            body.addEventListener("transitionend", onEnd, { once: true });
+        } else {
+            body.style.maxHeight = body.scrollHeight + "px";
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    section.classList.add("collapsed");
+                    body.style.maxHeight = "0";
+                });
+            });
+        }
+    }
+
+    defaultEnginesHeader.addEventListener("click", () => animateToggle(defaultEnginesSection, defaultEnginesBody));
+    menuItemsHeader.addEventListener("click", () => animateToggle(menuItemsSection, menuItemsBody));
 
     function showStatus(message, type) {
         status.textContent = message;
@@ -512,6 +569,31 @@ document.addEventListener("DOMContentLoaded", async () => {
         return card;
     }
 
+    function createClickableIcon(item) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.title = "Click to change icon";
+        btn.style.cssText = "background:none;border:none;cursor:pointer;padding:0;border-radius:6px;display:flex;transition:opacity 0.15s;flex-shrink:0;";
+        btn.onmouseenter = () => { btn.style.opacity = "0.7"; };
+        btn.onmouseleave = () => { btn.style.opacity = "1"; };
+        if (item.iconUrl) {
+            const img = document.createElement("img");
+            img.className = "engine-icon";
+            img.src = item.iconUrl;
+            img.alt = `${item.name} icon`;
+            img.referrerPolicy = "no-referrer";
+            img.onerror = function () { this.replaceWith(createFallbackIcon(item.name)); };
+            btn.appendChild(img);
+        } else {
+            const url = item.usesSelectedEngine
+                ? (getSearchEngineById(state.searchEngineId)?.url || item.url)
+                : item.url;
+            btn.appendChild(createFaviconElement(url, item.name));
+        }
+        btn.onclick = (e) => { e.stopPropagation(); openIconPicker(item); };
+        return btn;
+    }
+
     function createMenuItemCard(item, index) {
         const card = document.createElement("div");
         card.className = "engine-card";
@@ -519,7 +601,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         header.className = "engine-card-header";
         const title = document.createElement("div");
         title.className = "engine-title";
-        title.appendChild(createFaviconElement(item.url, item.name));
+        title.appendChild(createClickableIcon(item));
         updateTitleBlock(title, item, item.usesSelectedEngine ? "Uses selected default search engine" : item.url);
         if (item.builtIn) {
             const badge = document.createElement("span");
@@ -584,7 +666,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         header.className = "engine-card-header";
         const title = document.createElement("div");
         title.className = "engine-title";
-        title.appendChild(createFaviconElement(item.url, item.name));
+        title.appendChild(createClickableIcon(item));
         updateTitleBlock(title, item, item.url);
         header.appendChild(title);
         header.appendChild(createCardActions("customEngines", index, item, true));
@@ -675,12 +757,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         render();
         isDirty = false;
         updateSaveButtonState();
+        defaultEnginesSection.classList.add("collapsed");
     } catch (error) {
         console.error("Error loading settings:", error);
         showStatus("Error loading settings", "error");
         render();
         isDirty = false;
         updateSaveButtonState();
+        defaultEnginesSection.classList.add("collapsed");
     }
 
     engineSelect.addEventListener("change", () => {
@@ -789,6 +873,131 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (e.target === menuPickerModal) {
             menuPickerModal.classList.remove("show");
         }
+    });
+
+    let iconPickerTarget = null;
+    const iconPickerModal = document.getElementById("iconPickerModal");
+    const iconPickerCloseBtn = document.getElementById("iconPickerCloseBtn");
+    const iconUrlInput = document.getElementById("iconUrlInput");
+    const iconFileInput = document.getElementById("iconFileInput");
+    const iconPreviewImg = document.getElementById("iconPreviewImg");
+    const suggestedIcons = document.getElementById("suggestedIcons");
+    const noSuggestions = document.getElementById("noSuggestions");
+    const iconPickerApplyBtn = document.getElementById("iconPickerApplyBtn");
+    const iconPickerRemoveBtn = document.getElementById("iconPickerRemoveBtn");
+
+    function getItemDisplayUrl(item) {
+        return item.usesSelectedEngine
+            ? (getSearchEngineById(state.searchEngineId)?.url || item.url)
+            : item.url;
+    }
+
+    function buildSuggestedIcons(item) {
+        suggestedIcons.innerHTML = "";
+        noSuggestions.style.display = "none";
+        const url = getItemDisplayUrl(item);
+        if (!url || url === "__DEFAULT_ENGINE__") {
+            noSuggestions.style.display = "block";
+            noSuggestions.textContent = "No URL defined yet";
+            return;
+        }
+        const domains = extractDomainsFromUrl(url);
+        if (domains.length === 0) {
+            noSuggestions.style.display = "block";
+            return;
+        }
+        domains.forEach((domain) => {
+            const faviconUrl = `https://${domain}/favicon.ico`;
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.title = domain;
+            btn.style.cssText = "width:44px;height:44px;border-radius:10px;border:2px solid transparent;background:#2a2a2a;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;transition:border-color 0.15s;overflow:hidden;";
+            btn.onmouseenter = () => { btn.style.borderColor = "#666"; };
+            btn.onmouseleave = () => { btn.style.borderColor = "transparent"; };
+            const img = document.createElement("img");
+            img.src = faviconUrl;
+            img.alt = domain;
+            img.style.cssText = "width:28px;height:28px;object-fit:contain;";
+            img.onerror = () => {
+                img.style.display = "none";
+                const fallback = document.createElement("div");
+                fallback.style.cssText = "width:28px;height:28px;border-radius:6px;background:#3a3a3a;color:#ddd;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;text-transform:uppercase;";
+                fallback.textContent = domain.charAt(0).toUpperCase();
+                btn.appendChild(fallback);
+            };
+            btn.appendChild(img);
+            btn.onclick = () => {
+                setIconPreview(faviconUrl);
+                iconUrlInput.value = faviconUrl;
+            };
+            suggestedIcons.appendChild(btn);
+        });
+    }
+
+    function setIconPreview(url) {
+        iconPreviewImg.src = url;
+        iconPreviewImg.style.display = url ? "" : "none";
+        iconPreviewImg.onerror = () => { iconPreviewImg.style.display = "none"; };
+    }
+
+    function openIconPicker(item) {
+        iconPickerTarget = item;
+        iconUrlInput.value = item.iconUrl || "";
+        iconFileInput.value = "";
+        setIconPreview(item.iconUrl || "");
+        buildSuggestedIcons(item);
+        iconPickerModal.classList.add("show");
+    }
+
+    iconPickerCloseBtn.addEventListener("click", () => {
+        iconPickerModal.classList.remove("show");
+        iconPickerTarget = null;
+    });
+
+    iconPickerModal.addEventListener("click", (e) => {
+        if (e.target === iconPickerModal) {
+            iconPickerModal.classList.remove("show");
+            iconPickerTarget = null;
+        }
+    });
+
+    iconUrlInput.addEventListener("input", () => {
+        const val = iconUrlInput.value.trim();
+        if (val) {
+            setIconPreview(val);
+        } else {
+            setIconPreview("");
+        }
+    });
+
+    iconFileInput.addEventListener("change", () => {
+        const file = iconFileInput.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            iconUrlInput.value = dataUrl;
+            setIconPreview(dataUrl);
+        };
+        reader.readAsDataURL(file);
+    });
+
+    iconPickerApplyBtn.addEventListener("click", () => {
+        if (!iconPickerTarget) return;
+        iconPickerTarget.iconUrl = iconUrlInput.value.trim();
+        iconPickerModal.classList.remove("show");
+        iconPickerTarget = null;
+        render();
+        showStatus("Icon updated", "success");
+    });
+
+    iconPickerRemoveBtn.addEventListener("click", () => {
+        if (!iconPickerTarget) return;
+        iconPickerTarget.iconUrl = "";
+        iconPickerModal.classList.remove("show");
+        iconPickerTarget = null;
+        render();
+        showStatus("Icon removed", "success");
     });
 
     saveBtn.addEventListener("click", async () => {

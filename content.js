@@ -83,7 +83,8 @@
             name: raw?.name || fallback.name || 'Quick Search Item',
             url: url === '__DEFAULT_ENGINE__' ? '__DEFAULT_ENGINE__' : ensureQueryPlaceholder(url),
             queryMode: normalizeQueryMode(raw?.queryMode, fallback.queryMode || 'titleYear'),
-            usesSelectedEngine: url === '__DEFAULT_ENGINE__' || Boolean(raw?.usesSelectedEngine ?? fallback.usesSelectedEngine)
+            usesSelectedEngine: url === '__DEFAULT_ENGINE__' || Boolean(raw?.usesSelectedEngine ?? fallback.usesSelectedEngine),
+            iconUrl: raw?.iconUrl || ''
         };
     }
 
@@ -92,7 +93,8 @@
             id: raw?.id || `custom_${Date.now()}`,
             name: raw?.name || 'Custom Search',
             url: ensureQueryPlaceholder(raw?.url || ''),
-            queryMode: normalizeQueryMode(raw?.queryMode, 'titleYear')
+            queryMode: normalizeQueryMode(raw?.queryMode, 'titleYear'),
+            iconUrl: raw?.iconUrl || ''
         };
     }
 
@@ -316,9 +318,14 @@
     }
 
     function createMenuLink(item) {
+        const container = document.createElement('div');
+        container.style.cssText = 'display:flex;align-items:center;padding:0 24px;transition:background 0.2s;';
+        container.onmouseenter = () => { container.style.background = '#333'; };
+        container.onmouseleave = () => { container.style.background = 'transparent'; };
+
         const link = document.createElement('a');
         link.href = '#';
-        link.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 24px;color:#fff;text-decoration:none;cursor:pointer;transition:background 0.2s;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+        link.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 0;color:#fff;text-decoration:none;cursor:pointer;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;flex:1;min-width:0;';
         if (item.iconUrl) {
             const icon = document.createElement('img');
             icon.src = item.iconUrl;
@@ -331,15 +338,50 @@
         const text = document.createElement('span');
         text.textContent = item.text;
         link.appendChild(text);
-        link.onmouseenter = () => { link.style.background = '#333'; };
-        link.onmouseleave = () => { link.style.background = 'transparent'; };
         link.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
             closeMenu();
             window.open(item.url, '_blank');
         };
-        return link;
+
+        const btnGroup = document.createElement('div');
+        btnGroup.style.cssText = 'display:flex;gap:4px;flex-shrink:0;margin-left:auto;padding-left:12px;';
+
+        function createIconBtn(svgPath, title, url) {
+            if (!url) return null;
+            const btn = document.createElement('button');
+            btn.title = title;
+            btn.style.cssText = 'width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);cursor:pointer;color:#999;display:flex;align-items:center;justify-content:center;padding:0;transition:all 0.15s;';
+            btn.onmouseenter = () => { btn.style.background = 'rgba(255,255,255,0.15)'; btn.style.color = '#fff'; };
+            btn.onmouseleave = () => { btn.style.background = 'rgba(255,255,255,0.05)'; btn.style.color = '#999'; };
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', '13');
+            svg.setAttribute('height', '13');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('fill', 'currentColor');
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', svgPath);
+            svg.appendChild(path);
+            btn.appendChild(svg);
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                closeMenu();
+                window.open(url, '_blank');
+            };
+            return btn;
+        }
+
+        const titleBtn = createIconBtn('M5 4h14v3h-5.5v13h-3V7H5V4z', 'Search by title only', item.urlTitle);
+        if (titleBtn) btnGroup.appendChild(titleBtn);
+
+        const yearBtn = createIconBtn('M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z', 'Search by title and year', item.urlTitleYear);
+        if (yearBtn) btnGroup.appendChild(yearBtn);
+
+        container.appendChild(link);
+        container.appendChild(btnGroup);
+        return container;
     }
 
     async function getMenuItems(title, year) {
@@ -350,10 +392,14 @@
                 const mode = item.usesSelectedEngine && item.queryMode === 'configured' ? settings.searchQueryMode : item.queryMode;
                 const suffix = item.usesSelectedEngine && item.queryMode === 'configured' ? settings.suffix : '';
                 const query = buildQuery(title, year, mode, suffix);
+                const titleQuery = buildQuery(title, year, 'title', '');
+                const titleYearQuery = buildQuery(title, year, 'titleYear', '');
                 items.push({
                     text: item.name,
                     url: buildUrl(item.url, query, settings, item.queryMode),
-                    iconUrl: getFaviconUrl(item.url, settings)
+                    urlTitle: buildUrl(item.url, titleQuery, settings, item.queryMode),
+                    urlTitleYear: buildUrl(item.url, titleYearQuery, settings, item.queryMode),
+                    iconUrl: item.iconUrl || getFaviconUrl(item.url, settings)
                 });
             });
             if (settings.customEngines.length > 0 && items.length > 0) {
@@ -361,10 +407,14 @@
             }
             settings.customEngines.forEach((item) => {
                 const query = buildQuery(title, year, item.queryMode, '');
+                const titleQuery = buildQuery(title, year, 'title', '');
+                const titleYearQuery = buildQuery(title, year, 'titleYear', '');
                 items.push({
                     text: item.name,
                     url: buildUrl(item.url, query, settings, item.queryMode),
-                    iconUrl: getFaviconUrl(item.url, settings)
+                    urlTitle: buildUrl(item.url, titleQuery, settings, item.queryMode),
+                    urlTitleYear: buildUrl(item.url, titleYearQuery, settings, item.queryMode),
+                    iconUrl: item.iconUrl || getFaviconUrl(item.url, settings)
                 });
             });
             return items;
@@ -375,9 +425,13 @@
                 const mode = item.queryMode === 'configured' ? settings.searchQueryMode : item.queryMode;
                 const suffix = item.queryMode === 'configured' ? settings.suffix : '';
                 const query = buildQuery(title, year, mode, suffix);
+                const titleQuery = buildQuery(title, year, 'title', '');
+                const titleYearQuery = buildQuery(title, year, 'titleYear', '');
                 return {
                     text: item.name,
                     url: buildUrl(item.url, query, settings, item.queryMode),
+                    urlTitle: buildUrl(item.url, titleQuery, settings, item.queryMode),
+                    urlTitleYear: buildUrl(item.url, titleYearQuery, settings, item.queryMode),
                     iconUrl: getFaviconUrl(item.url, settings)
                 };
             });
