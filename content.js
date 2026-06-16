@@ -99,7 +99,7 @@
         return 'imdb';
     }
 
-    function normalizeSettings(data) {
+    function normalizeSettings(data, overrideProfileId) {
         const searchEngines = Array.isArray(data.searchEngines) && data.searchEngines.length > 0
             ? data.searchEngines.map((item, index) => normalizeSearchEngine(item, DEFAULT_SEARCH_ENGINES[index] || DEFAULT_SEARCH_ENGINES[0]))
             : DEFAULT_SEARCH_ENGINES.map((item) => normalizeSearchEngine(item, item));
@@ -119,7 +119,7 @@
             : [];
 
         if (data.profiles) {
-            const profileId = getProfileIdForHost();
+            const profileId = overrideProfileId || getProfileIdForHost();
             const profile = data.profiles[profileId];
             if (profile) {
                 suffix = typeof profile.suffix === 'string' ? profile.suffix : suffix;
@@ -403,9 +403,9 @@
         return container;
     }
 
-    async function getMenuItems(title, year) {
+    async function getMenuItems(title, year, overrideProfileId) {
         try {
-            const settings = normalizeSettings(await browser.storage.local.get(null));
+            const settings = normalizeSettings(await browser.storage.local.get(null), overrideProfileId);
             const items = [];
             settings.menuItems.forEach((item) => {
                 const mode = item.usesSelectedEngine && item.queryMode === 'configured' ? settings.searchQueryMode : item.queryMode;
@@ -520,34 +520,74 @@
         rightPanel.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;';
 
         const header = document.createElement('div');
-        header.style.cssText = 'padding:24px 24px 16px;border-bottom:1px solid #333;';
+        header.style.cssText = 'padding:20px 48px 14px 24px;border-bottom:1px solid #333;';
+
+        const headerTop = document.createElement('div');
+        headerTop.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;';
+
         const h3 = document.createElement('h3');
-        h3.style.cssText = 'margin:0 0 8px 0;color:#fff;font-size:20px;font-weight:500;';
-        h3.textContent = 'Quick Search';
+        h3.style.cssText = 'margin:0;color:#fff;font-size:20px;font-weight:500;';
+        h3.textContent = 'Quick rer\u00e9:Search';
+        headerTop.appendChild(h3);
+
+        const profileSelect = document.createElement('select');
+        profileSelect.style.cssText = 'font-size:12px;padding:2px 6px;border-radius:3px;border:1px solid #333;background:#1a1a1a;color:#fff;cursor:pointer;max-width:150px;outline:none;';
+        headerTop.appendChild(profileSelect);
+
         const titleDiv = document.createElement('div');
         titleDiv.style.cssText = 'color:#aaa;font-size:14px;';
         titleDiv.textContent = year ? `${title} (${year})` : title;
-        header.appendChild(h3);
+
+        header.appendChild(headerTop);
         header.appendChild(titleDiv);
 
         const listContainer = document.createElement('div');
         listContainer.style.padding = '8px 0';
 
-        getMenuItems(title, year).then((items) => {
-            items.forEach((item, index) => {
-                if (item.isDivider) {
-                    const divider = document.createElement('div');
-                    divider.style.cssText = 'border-top:1px solid #333;margin:0;width:100%;';
-                    listContainer.appendChild(divider);
-                    return;
-                }
-                listContainer.appendChild(createMenuLink(item));
-                if (index < items.length - 1 && !items[index + 1]?.isDivider) {
-                    const divider = document.createElement('div');
-                    divider.style.cssText = 'border-top:1px solid #333;margin:0;width:100%;';
-                    listContainer.appendChild(divider);
-                }
+        function renderMenuItems(profileId) {
+            listContainer.innerHTML = '';
+            getMenuItems(title, year, profileId).then((items) => {
+                items.forEach((item, index) => {
+                    if (item.isDivider) {
+                        const divider = document.createElement('div');
+                        divider.style.cssText = 'border-top:1px solid #333;margin:0;width:100%;';
+                        listContainer.appendChild(divider);
+                        return;
+                    }
+                    listContainer.appendChild(createMenuLink(item));
+                    if (index < items.length - 1 && !items[index + 1]?.isDivider) {
+                        const divider = document.createElement('div');
+                        divider.style.cssText = 'border-top:1px solid #333;margin:0;width:100%;';
+                        listContainer.appendChild(divider);
+                    }
+                });
             });
+        }
+
+        browser.storage.local.get(null).then((data) => {
+            const currentProfileId = getProfileIdForHost();
+            const profiles = data.profiles || {};
+            const allIds = Object.keys(profiles);
+            if (allIds.length > 0) {
+                allIds.forEach((id) => {
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = profiles[id]?.name || id;
+                    if (id === currentProfileId) option.selected = true;
+                    profileSelect.appendChild(option);
+                });
+            } else {
+                const option = document.createElement('option');
+                option.value = currentProfileId;
+                option.textContent = currentProfileId;
+                option.selected = true;
+                profileSelect.appendChild(option);
+            }
+            renderMenuItems(profileSelect.value);
+        });
+
+        profileSelect.addEventListener('change', () => {
+            renderMenuItems(profileSelect.value);
         });
 
         rightPanel.appendChild(header);
