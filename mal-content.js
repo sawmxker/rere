@@ -463,7 +463,7 @@
         overlay.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:${overlayBg};z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:20px;font-family:Verdana,Arial;`;
 
         const modal = document.createElement('div');
-        modal.style.cssText = `background:${bgColor};border-radius:4px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.6);border:1px solid ${borderColor};color:${textColor};font-family:Verdana,Arial;`;
+        modal.style.cssText = `background:${bgColor};border-radius:4px;max-width:640px;width:100%;max-height:90vh;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.6);border:1px solid ${borderColor};color:${textColor};font-family:Verdana,Arial;display:flex;overflow:hidden;`;
 
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '✕';
@@ -472,28 +472,64 @@
         closeBtn.onmouseleave = () => { closeBtn.style.background = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'; };
         closeBtn.onclick = (e) => { e.stopPropagation(); closeMenu(); };
 
-        const header = document.createElement('div');
-        header.style.cssText = `padding:24px 24px 16px;border-bottom:1px solid ${borderColor};display:flex;gap:16px;align-items:flex-start;`;
-        if (posterUrl) {
-            const posterImg = document.createElement('img');
-            posterImg.src = posterUrl;
-            posterImg.alt = title;
-            posterImg.style.cssText = 'width:80px;height:120px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#f0f0f0;';
-            posterImg.onerror = () => { posterImg.style.display = 'none'; };
-            header.appendChild(posterImg);
-        }
+        const leftPanel = document.createElement('div');
+        leftPanel.style.cssText = 'width:220px;flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;padding:20px 0 20px 20px;';
 
-        const headerText = document.createElement('div');
-        headerText.style.flex = '1';
+        const coverContainer = document.createElement('div');
+        coverContainer.style.cssText = 'width:200px;position:relative;border-radius:6px;overflow:hidden;cursor:pointer;transform-style:preserve-3d;transition:transform 0.1s ease-out;';
+        coverContainer.style.perspective = '600px';
+
+        const coverImg = document.createElement('img');
+        if (posterUrl) {
+            coverImg.src = posterUrl;
+        } else {
+            coverImg.style.display = 'none';
+        }
+        coverImg.alt = title;
+        coverImg.style.cssText = 'display:block;width:100%;height:auto;border-radius:6px;background:#f0f0f0;';
+        coverImg.onerror = () => { coverImg.style.display = 'none'; };
+        coverContainer.appendChild(coverImg);
+
+        const glare = document.createElement('div');
+        glare.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;border-radius:6px;pointer-events:none;transition:background 0.1s ease-out;';
+        coverContainer.appendChild(glare);
+
+        const shine = document.createElement('div');
+        shine.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;border-radius:6px;pointer-events:none;background:linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%, rgba(0,0,0,0.04) 100%);';
+        coverContainer.appendChild(shine);
+
+        coverContainer.addEventListener('mousemove', (e) => {
+            const rect = coverContainer.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            const rotX = (y - 0.5) * -20;
+            const rotY = (x - 0.5) * 20;
+            coverContainer.style.transform = `perspective(600px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale3d(1.03,1.03,1.03)`;
+            const glareX = x * 100;
+            const glareY = y * 100;
+            glare.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 30%, transparent 60%)`;
+        });
+
+        coverContainer.addEventListener('mouseleave', () => {
+            coverContainer.style.transform = 'perspective(600px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)';
+            glare.style.background = 'transparent';
+        });
+
+        leftPanel.appendChild(coverContainer);
+
+        const rightPanel = document.createElement('div');
+        rightPanel.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;';
+
+        const header = document.createElement('div');
+        header.style.cssText = `padding:24px 24px 16px;border-bottom:1px solid ${borderColor};`;
         const h3 = document.createElement('h3');
         h3.style.cssText = `margin:0 0 8px 0;color:${textColor};font-size:20px;font-weight:700;`;
         h3.textContent = 'Quick Search';
         const titleDiv = document.createElement('div');
         titleDiv.style.cssText = `color:${mutedColor};font-size:14px;`;
         titleDiv.textContent = year ? `${title} (${year})` : title;
-        headerText.appendChild(h3);
-        headerText.appendChild(titleDiv);
-        header.appendChild(headerText);
+        header.appendChild(h3);
+        header.appendChild(titleDiv);
 
         const listContainer = document.createElement('div');
         listContainer.style.padding = '8px 0';
@@ -515,9 +551,12 @@
             });
         });
 
+        rightPanel.appendChild(header);
+        rightPanel.appendChild(listContainer);
+
         modal.appendChild(closeBtn);
-        modal.appendChild(header);
-        modal.appendChild(listContainer);
+        modal.appendChild(leftPanel);
+        modal.appendChild(rightPanel);
         overlay.appendChild(modal);
         overlay.onclick = (e) => { if (e.target === overlay) closeMenu(); };
         escHandler = (e) => { if (e.key === 'Escape') { e.preventDefault(); closeMenu(); } };
