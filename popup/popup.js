@@ -10,11 +10,26 @@ function normalizeSettings(raw) {
         : DEFAULT_STANDARD_ENGINES;
     const searchEngineId = raw.searchEngineId || raw.searchEngine || searchEngines[0]?.id || "google";
 
+    let suffix = typeof raw.suffix === "string" ? raw.suffix : "watch";
+    let searchQueryMode = raw.searchQueryMode === "title" ? "title" : "titleYear";
+    let activeProfileId = raw.activeProfileId || "";
+    let activeProfileName = "";
+
+    if (raw.profiles) {
+        const profile = raw.profiles[activeProfileId] || raw.profiles["imdb"];
+        if (profile) {
+            suffix = typeof profile.suffix === "string" ? profile.suffix : suffix;
+            searchQueryMode = profile.searchQueryMode === "title" ? "title" : "titleYear";
+            activeProfileName = profile.name || "";
+        }
+    }
+
     return {
-        suffix: typeof raw.suffix === "string" ? raw.suffix : "watch",
+        suffix,
         searchEngineId,
-        searchQueryMode: raw.searchQueryMode === "title" ? "title" : "titleYear",
-        searchEngines
+        searchQueryMode,
+        searchEngines,
+        activeProfileName
     };
 }
 
@@ -23,6 +38,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const settings = normalizeSettings(await browser.storage.local.get(null));
         const currentEngine = settings.searchEngines.find((engine) => engine.id === settings.searchEngineId);
 
+        document.getElementById("currentProfile").textContent = settings.activeProfileName || "IMDb";
         document.getElementById("currentEngine").textContent = currentEngine?.name || "Google";
         document.getElementById("currentQueryMode").textContent =
             settings.searchQueryMode === "title" ? "title" : "title+year";

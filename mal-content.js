@@ -8,13 +8,10 @@
     ];
 
     const DEFAULT_MENU_ITEMS = [
-        { id: 'menu_info', name: 'Search in new tab (info)', url: '__DEFAULT_ENGINE__', queryMode: 'configured', usesSelectedEngine: true, builtIn: true },
-        { id: 'menu_title', name: 'Search in new tab (by title)', url: '__DEFAULT_ENGINE__', queryMode: 'title', usesSelectedEngine: true, builtIn: true },
+        { id: 'menu_search', name: 'Search in new tab', url: '__DEFAULT_ENGINE__', queryMode: 'titleYear', usesSelectedEngine: true, builtIn: true },
         { id: 'menu_youtube', name: 'Search YouTube', url: 'https://www.youtube.com/results?search_query={query}', queryMode: 'title', builtIn: true },
         { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true },
-        { id: 'menu_mal_visit', name: 'Visit MyAnimeList page', url: 'https://www.google.com/search?q=site:myanimelist.net+{query}&btnI', queryMode: 'titleYear', builtIn: true },
         { id: 'menu_archive', name: 'Search Archive.org', url: 'https://archive.org/search?query={query}', queryMode: 'title', builtIn: true },
-        { id: 'menu_animetosho', name: 'Search Animetosho', url: 'https://animetosho.org/search?q={query}', queryMode: 'title', builtIn: true },
         { id: 'menu_rutracker', name: 'Search RuTracker', url: 'https://rutracker.org/forum/tracker.php?nm={query}', queryMode: 'titleYear', builtIn: true }
     ];
 
@@ -27,7 +24,7 @@
         const titleEl = document.querySelector('h1.title-name strong') ||
                         document.querySelector('h1.h1_bold_none strong') ||
                         document.querySelector('h1.title-name') ||
-                        document.querySelector('[itemprop="name"] h1');
+                        document.querySelector('[itemprop="name"]');
         if (titleEl) {
             title = titleEl.innerText.replace(/\s*\(TV.*?\)\s*$/, '').replace(/\s*\(Movie\)\s*$/, '').replace(/\s*\(\w+ \d{4}\)\s*$/, '').trim();
         }
@@ -49,9 +46,12 @@
             const pads = document.querySelectorAll('.spaceit_pad');
             for (const pad of pads) {
                 const dt = pad.querySelector('.dark_text');
-                if (dt && dt.textContent.trim() === 'Aired:') {
-                    const match = pad.textContent.match(/\b(19|20)\d{2}\b/);
-                    if (match) { year = match[0]; break; }
+                if (dt) {
+                    const label = dt.textContent.trim();
+                    if (label === 'Aired:' || label === 'Published:') {
+                        const match = pad.textContent.match(/\b(19|20)\d{2}\b/);
+                        if (match) { year = match[0]; break; }
+                    }
                 }
             }
         }
@@ -110,26 +110,51 @@
         };
     }
 
+    function getProfileIdForHost() {
+        const path = window.location.pathname;
+        if (path.startsWith('/anime/')) return 'mal-anime';
+        if (path.startsWith('/manga/')) return 'mal-manga';
+        return 'mal-anime';
+    }
+
     function normalizeSettings(data) {
         const searchEngines = Array.isArray(data.searchEngines) && data.searchEngines.length > 0
             ? data.searchEngines.map((item, index) => normalizeSearchEngine(item, DEFAULT_SEARCH_ENGINES[index] || DEFAULT_SEARCH_ENGINES[0]))
             : DEFAULT_SEARCH_ENGINES.map((item) => normalizeSearchEngine(item, item));
-        const menuItems = Array.isArray(data.menuItems) && data.menuItems.length > 0
-            ? data.menuItems.map((item, index) => normalizeMenuItem(item, DEFAULT_MENU_ITEMS[index] || DEFAULT_MENU_ITEMS[0]))
-            : DEFAULT_MENU_ITEMS.map((item) => normalizeMenuItem(item, item));
-        const customEngines = Array.isArray(data.customEngines)
-            ? data.customEngines.map(normalizeCustomEngine)
-            : [];
 
         let searchEngineId = data.searchEngineId || data.searchEngine || searchEngines[0]?.id || 'google';
         if (!searchEngines.some((engine) => engine.id === searchEngineId)) {
             searchEngineId = searchEngines[0]?.id || 'google';
         }
 
+        let suffix = typeof data.suffix === 'string' ? data.suffix : 'watch';
+        let searchQueryMode = normalizeQueryMode(data.searchQueryMode, 'titleYear');
+        let menuItems = Array.isArray(data.menuItems) && data.menuItems.length > 0
+            ? data.menuItems.map((item, index) => normalizeMenuItem(item, DEFAULT_MENU_ITEMS[index] || DEFAULT_MENU_ITEMS[0]))
+            : DEFAULT_MENU_ITEMS.map((item) => normalizeMenuItem(item, item));
+        let customEngines = Array.isArray(data.customEngines)
+            ? data.customEngines.map(normalizeCustomEngine)
+            : [];
+
+        if (data.profiles) {
+            const profileId = getProfileIdForHost();
+            const profile = data.profiles[profileId];
+            if (profile) {
+                suffix = typeof profile.suffix === 'string' ? profile.suffix : suffix;
+                searchQueryMode = normalizeQueryMode(profile.searchQueryMode, searchQueryMode);
+                menuItems = Array.isArray(profile.menuItems) && profile.menuItems.length > 0
+                    ? profile.menuItems.map((item, index) => normalizeMenuItem(item, DEFAULT_MENU_ITEMS[index] || DEFAULT_MENU_ITEMS[0]))
+                    : menuItems;
+                customEngines = Array.isArray(profile.customEngines)
+                    ? profile.customEngines.map(normalizeCustomEngine)
+                    : customEngines;
+            }
+        }
+
         return {
-            suffix: typeof data.suffix === 'string' ? data.suffix : 'watch',
+            suffix,
             searchEngineId,
-            searchQueryMode: normalizeQueryMode(data.searchQueryMode, 'titleYear'),
+            searchQueryMode,
             searchEngines,
             menuItems,
             customEngines

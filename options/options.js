@@ -6,13 +6,47 @@ const DEFAULT_SEARCH_ENGINES = [
 ];
 
 const DEFAULT_MENU_ITEMS = [
-    { id: "menu_info", name: "Search in new tab (info)", url: "__DEFAULT_ENGINE__", queryMode: "configured", builtIn: true, usesSelectedEngine: true },
-    { id: "menu_title", name: "Search in new tab (by title)", url: "__DEFAULT_ENGINE__", queryMode: "title", builtIn: true, usesSelectedEngine: true },
+    { id: "menu_search", name: "Search in new tab", url: "__DEFAULT_ENGINE__", queryMode: "titleYear", builtIn: true, usesSelectedEngine: true },
     { id: "menu_youtube", name: "Search YouTube", url: "https://www.youtube.com/results?search_query={query}", queryMode: "title", builtIn: true },
     { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true },
     { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?query={query}", queryMode: "title", builtIn: true },
     { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "titleYear", builtIn: true }
 ];
+
+const DEFAULT_PROFILES_CONFIG = [
+    {
+        id: "imdb",
+        name: "IMDb",
+        suffix: "watch",
+        searchQueryMode: "titleYear",
+        menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
+        customEngines: []
+    },
+    {
+        id: "mal-anime",
+        name: "MAL anime",
+        suffix: "watch",
+        searchQueryMode: "titleYear",
+        menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
+        customEngines: []
+    },
+    {
+        id: "mal-manga",
+        name: "MAL manga",
+        suffix: "read",
+        searchQueryMode: "titleYear",
+        menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
+        customEngines: []
+    }
+];
+
+function cloneProfileConfig(config) {
+    return {
+        ...config,
+        menuItems: config.menuItems.map(i => ({ ...i })),
+        customEngines: config.customEngines.map(i => ({ ...i }))
+    };
+}
 
 const DEFAULT_SETTINGS = {
     suffix: "watch",
@@ -22,6 +56,8 @@ const DEFAULT_SETTINGS = {
     menuItems: DEFAULT_MENU_ITEMS,
     customEngines: []
 };
+
+const DEFAULT_PROFILE_IDS = DEFAULT_PROFILES_CONFIG.map(p => p.id);
 
 const YANDEX_DOMAINS = [
     "yandex.com",
@@ -38,13 +74,20 @@ let state = createDefaultState();
 let isDirty = false;
 
 function createDefaultState() {
+    const profiles = {};
+    DEFAULT_PROFILES_CONFIG.forEach((cfg) => {
+        profiles[cfg.id] = cloneProfileConfig(cfg);
+    });
+    const imdb = profiles["imdb"];
     return {
-        suffix: DEFAULT_SETTINGS.suffix,
+        suffix: imdb.suffix,
         searchEngineId: DEFAULT_SETTINGS.searchEngineId,
-        searchQueryMode: DEFAULT_SETTINGS.searchQueryMode,
+        searchQueryMode: imdb.searchQueryMode,
         searchEngines: DEFAULT_SEARCH_ENGINES.map((item) => ({ ...item })),
-        menuItems: DEFAULT_MENU_ITEMS.map((item) => ({ ...item })),
-        customEngines: []
+        menuItems: imdb.menuItems,
+        customEngines: imdb.customEngines,
+        profiles,
+        activeProfileId: "imdb"
     };
 }
 
@@ -233,20 +276,10 @@ function normalizeSettings(raw) {
     const rawSearchEngines = Array.isArray(raw.searchEngines) && raw.searchEngines.length > 0
         ? raw.searchEngines
         : DEFAULT_SEARCH_ENGINES;
-    const rawMenuItems = Array.isArray(raw.menuItems) && raw.menuItems.length > 0
-        ? raw.menuItems
-        : DEFAULT_MENU_ITEMS;
-    const rawCustomEngines = Array.isArray(raw.customEngines) ? raw.customEngines : [];
 
     next.searchEngines = rawSearchEngines.map((item, index) =>
         normalizeSearchEngine(item, DEFAULT_SEARCH_ENGINES[index] || DEFAULT_SEARCH_ENGINES[0])
     );
-    next.menuItems = rawMenuItems.map((item, index) =>
-        normalizeMenuItem(item, DEFAULT_MENU_ITEMS[index] || DEFAULT_MENU_ITEMS[0])
-    );
-    next.customEngines = rawCustomEngines.map(normalizeCustomEngine);
-    next.suffix = typeof raw.suffix === "string" ? raw.suffix : DEFAULT_SETTINGS.suffix;
-    next.searchQueryMode = normalizeQueryMode(raw.searchQueryMode, DEFAULT_SETTINGS.searchQueryMode);
 
     if (!Array.isArray(raw.searchEngines) && raw.searchEngine === "custom" && raw.customSearchUrl) {
         const migratedId = "custom_migrated_default";
@@ -264,21 +297,124 @@ function normalizeSettings(raw) {
             : next.searchEngines[0]?.id || DEFAULT_SETTINGS.searchEngineId;
     }
 
+    // --- Profile handling ---
+    if (raw.profiles && typeof raw.profiles === "object") {
+        next.activeProfileId = DEFAULT_PROFILE_IDS.includes(raw.activeProfileId)
+            ? raw.activeProfileId
+            : "imdb";
+        DEFAULT_PROFILES_CONFIG.forEach((def) => {
+            const existing = raw.profiles[def.id];
+            if (existing) {
+                next.profiles[def.id] = {
+                    id: def.id,
+                    name: existing.name || def.name,
+                    suffix: typeof existing.suffix === "string" ? existing.suffix : def.suffix,
+                    searchQueryMode: normalizeQueryMode(existing.searchQueryMode, def.searchQueryMode),
+                    menuItems: Array.isArray(existing.menuItems) && existing.menuItems.length > 0
+                        ? existing.menuItems.map((item, index) => normalizeMenuItem(item, def.menuItems[index] || def.menuItems[0]))
+                        : def.menuItems.map(i => ({ ...i })),
+                    customEngines: Array.isArray(existing.customEngines)
+                        ? existing.customEngines.map(normalizeCustomEngine)
+                        : []
+                };
+            }
+        });
+        Object.keys(raw.profiles).forEach((id) => {
+            if (!DEFAULT_PROFILE_IDS.includes(id) && raw.profiles[id]) {
+                const rp = raw.profiles[id];
+                next.profiles[id] = {
+                    id,
+                    name: rp.name || id,
+                    suffix: typeof rp.suffix === "string" ? rp.suffix : DEFAULT_SETTINGS.suffix,
+                    searchQueryMode: normalizeQueryMode(rp.searchQueryMode, DEFAULT_SETTINGS.searchQueryMode),
+                    menuItems: Array.isArray(rp.menuItems)
+                        ? rp.menuItems.map((item, index) => normalizeMenuItem(item, DEFAULT_MENU_ITEMS[0]))
+                        : [],
+                    customEngines: Array.isArray(rp.customEngines)
+                        ? rp.customEngines.map(normalizeCustomEngine)
+                        : []
+                };
+            }
+        });
+    } else {
+        // Migration from flat format
+        const rawMenuItems = Array.isArray(raw.menuItems) && raw.menuItems.length > 0
+            ? raw.menuItems
+            : DEFAULT_MENU_ITEMS;
+        const rawCustomEngines = Array.isArray(raw.customEngines) ? raw.customEngines : [];
+        const migratedMenuItems = rawMenuItems.map((item, index) =>
+            normalizeMenuItem(item, DEFAULT_MENU_ITEMS[index] || DEFAULT_MENU_ITEMS[0])
+        );
+        const migratedCustomEngines = rawCustomEngines.map(normalizeCustomEngine);
+
+        next.profiles["imdb"].suffix = typeof raw.suffix === "string" ? raw.suffix : DEFAULT_SETTINGS.suffix;
+        next.profiles["imdb"].searchQueryMode = normalizeQueryMode(raw.searchQueryMode, DEFAULT_SETTINGS.searchQueryMode);
+        next.profiles["imdb"].menuItems = migratedMenuItems;
+        next.profiles["imdb"].customEngines = migratedCustomEngines;
+        next.activeProfileId = "imdb";
+    }
+
+    const active = next.profiles[next.activeProfileId];
+    if (active) {
+        next.suffix = active.suffix;
+        next.searchQueryMode = active.searchQueryMode;
+        next.menuItems = active.menuItems;
+        next.customEngines = active.customEngines;
+    }
+
     return next;
 }
 
 function serializeSettings() {
+    const profile = getActiveProfile();
+    if (profile) {
+        profile.suffix = state.suffix;
+        profile.searchQueryMode = state.searchQueryMode;
+        profile.menuItems = state.menuItems;
+        profile.customEngines = state.customEngines;
+    }
+
+    const serializedProfiles = {};
+    Object.keys(state.profiles).forEach((id) => {
+        const p = state.profiles[id];
+        serializedProfiles[id] = {
+            id: p.id,
+            name: p.name,
+            suffix: p.suffix,
+            searchQueryMode: p.searchQueryMode,
+            menuItems: p.menuItems.map((item) => ({
+                id: item.id,
+                name: item.name.trim(),
+                url: item.usesSelectedEngine ? "__DEFAULT_ENGINE__" : ensureQueryPlaceholder(item.url),
+                queryMode: normalizeQueryMode(item.queryMode),
+                builtIn: Boolean(item.builtIn),
+                usesSelectedEngine: Boolean(item.usesSelectedEngine),
+                iconUrl: item.iconUrl || ""
+            })),
+            customEngines: p.customEngines.map((item) => ({
+                id: item.id,
+                name: item.name.trim(),
+                url: ensureQueryPlaceholder(item.url),
+                queryMode: normalizeQueryMode(item.queryMode),
+                iconUrl: item.iconUrl || ""
+            }))
+        };
+    });
+
     return {
-        suffix: state.suffix,
         searchEngineId: state.searchEngineId,
         searchEngine: state.searchEngineId,
-        searchQueryMode: state.searchQueryMode,
         searchEngines: state.searchEngines.map((item) => ({
             id: item.id,
             name: item.name.trim(),
             url: ensureQueryPlaceholder(item.url),
             builtIn: Boolean(item.builtIn)
         })),
+        activeProfileId: state.activeProfileId,
+        profiles: serializedProfiles,
+        // flat legacy fields for backward compat
+        suffix: state.suffix,
+        searchQueryMode: state.searchQueryMode,
         menuItems: state.menuItems.map((item) => ({
             id: item.id,
             name: item.name.trim(),
@@ -311,6 +447,27 @@ function moveItem(items, index, direction) {
 
 function getSearchEngineById(id) {
     return state.searchEngines.find((item) => item.id === id) || state.searchEngines[0];
+}
+
+function getActiveProfile() {
+    return state.profiles[state.activeProfileId] || state.profiles["imdb"] || state.profiles[Object.keys(state.profiles)[0]];
+}
+
+function saveCurrentProfileToState() {
+    const profile = getActiveProfile();
+    if (!profile) return;
+    profile.suffix = state.suffix;
+    profile.searchQueryMode = state.searchQueryMode;
+    profile.menuItems = state.menuItems;
+    profile.customEngines = state.customEngines;
+}
+
+function loadProfileIntoState(profile) {
+    if (!profile) return;
+    state.suffix = profile.suffix;
+    state.searchQueryMode = profile.searchQueryMode;
+    state.menuItems = profile.menuItems;
+    state.customEngines = profile.customEngines;
 }
 
 function createFallbackIcon(label) {
@@ -372,6 +529,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const menuItemsSection = document.getElementById("menuItemsSection");
     const menuItemsHeader = document.getElementById("menuItemsHeader");
     const menuItemsBody = document.getElementById("menuItemsBody");
+
+    const profileSelect = document.getElementById("profileSelect");
+    const addProfileBtn = document.getElementById("addProfileBtn");
+    const deleteProfileBtn = document.getElementById("deleteProfileBtn");
+    const profileSectionIndicator = document.getElementById("profileSectionIndicator");
+    const menuProfileIndicator = document.getElementById("menuProfileIndicator");
 
     function animateToggle(section, body) {
         if (section.classList.contains("collapsed")) {
@@ -740,6 +903,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         saveBtn.classList.toggle('btn-unsaved', isDirty);
     }
 
+    function renderProfileSelect() {
+        const currentId = state.activeProfileId;
+        profileSelect.innerHTML = "";
+        const ids = Object.keys(state.profiles);
+        if (ids.length === 0) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "No profiles";
+            profileSelect.appendChild(opt);
+            return;
+        }
+        ids.forEach((id) => {
+            const p = state.profiles[id];
+            if (!p) return;
+            const opt = document.createElement("option");
+            opt.value = id;
+            opt.textContent = p.name || id;
+            if (id === currentId) opt.selected = true;
+            profileSelect.appendChild(opt);
+        });
+        const profile = getActiveProfile();
+        const profileName = profile ? profile.name : "";
+        profileSectionIndicator.textContent = `(Profile: ${profileName})`;
+        menuProfileIndicator.textContent = `(Profile: ${profileName})`;
+    }
+
     function render() {
         isDirty = true;
         updateEngineSelect();
@@ -750,6 +939,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateSearchPreview();
         updateBuilderPreview();
         updateSaveButtonState();
+        renderProfileSelect();
     }
 
     try {
@@ -784,6 +974,63 @@ document.addEventListener("DOMContentLoaded", async () => {
         isDirty = true;
         updateSaveButtonState();
         updateSearchPreview();
+    });
+
+    profileSelect.addEventListener("change", () => {
+        const newId = profileSelect.value;
+        if (!newId || newId === state.activeProfileId) return;
+        const oldProfile = getActiveProfile();
+        if (oldProfile) {
+            oldProfile.suffix = state.suffix;
+            oldProfile.searchQueryMode = state.searchQueryMode;
+            oldProfile.menuItems = state.menuItems;
+            oldProfile.customEngines = state.customEngines;
+        }
+        state.activeProfileId = newId;
+        const newProfile = getActiveProfile();
+        if (newProfile) {
+            state.suffix = newProfile.suffix;
+            state.searchQueryMode = newProfile.searchQueryMode;
+            state.menuItems = newProfile.menuItems;
+            state.customEngines = newProfile.customEngines;
+        }
+        render();
+    });
+
+    addProfileBtn.addEventListener("click", () => {
+        const name = prompt("Enter a name for the new profile:");
+        if (!name || !name.trim()) return;
+        const id = "profile_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+        const newProfile = {
+            id,
+            name: name.trim(),
+            suffix: DEFAULT_SETTINGS.suffix,
+            searchQueryMode: DEFAULT_SETTINGS.searchQueryMode,
+            menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
+            customEngines: []
+        };
+        state.profiles[id] = newProfile;
+        state.activeProfileId = id;
+        loadProfileIntoState(newProfile);
+        render();
+        showStatus("Profile created", "success");
+    });
+
+    deleteProfileBtn.addEventListener("click", () => {
+        const ids = Object.keys(state.profiles);
+        if (ids.length <= 1) {
+            showStatus("Cannot delete the last profile", "error");
+            return;
+        }
+        const profile = getActiveProfile();
+        if (!profile) return;
+        if (!confirm(`Delete profile "${profile.name}"? This cannot be undone.`)) return;
+        delete state.profiles[state.activeProfileId];
+        const remainingIds = Object.keys(state.profiles);
+        state.activeProfileId = remainingIds[0];
+        loadProfileIntoState(state.profiles[remainingIds[0]]);
+        render();
+        showStatus("Profile deleted", "success");
     });
 
     defaultEngineUrlInput.addEventListener("input", updateBuilderPreview);
@@ -1005,6 +1252,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         state.searchEngineId = engineSelect.value;
         state.searchQueryMode = searchQueryModeSelect.value;
 
+        const profile = getActiveProfile();
+        if (profile) {
+            profile.suffix = state.suffix;
+            profile.searchQueryMode = state.searchQueryMode;
+            profile.menuItems = state.menuItems;
+            profile.customEngines = state.customEngines;
+        }
+
         const invalidDefault = state.searchEngines.find((item) => !item.name.trim() || !isValidHttpUrl(item.url));
         const invalidMenuItem = state.menuItems.find((item) => {
             if (!item.name.trim()) {
@@ -1060,4 +1315,5 @@ document.addEventListener("DOMContentLoaded", async () => {
             showStatus("Error resetting settings", "error");
         }
     });
+
 });

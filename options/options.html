@@ -493,6 +493,33 @@
             transform: rotate(-45deg);
         }
 
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .profile-label {
+            font-size: 11px;
+            color: #aaa;
+            white-space: nowrap;
+            margin-bottom: 0;
+            font-weight: 400;
+        }
+
+        .profile-header select {
+            width: auto;
+            min-width: 130px;
+            padding: 6px 8px;
+            font-size: 12px;
+            background: var(--panel-muted);
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            color: var(--text);
+        }
+
         @media (max-width: 720px) {
             body {
                 padding: 20px 12px;
@@ -520,11 +547,17 @@
                 <h1>reré: IMDb Quick ReSearching</h1>
                 <div class="subtitle">Customize default engines, quick menu items, query templates, and site favicons.</div>
             </div>
+            <div class="profile-header">
+                <label for="profileSelect" class="profile-label">Profile:</label>
+                <select id="profileSelect"></select>
+                <button type="button" id="addProfileBtn" class="mini-btn" title="Create new profile" style="font-size:15px;font-weight:700;line-height:1;">+</button>
+                <button type="button" id="deleteProfileBtn" class="mini-btn mini-btn-danger" title="Delete profile" style="font-size:11px;">Delete</button>
+            </div>
         </div>
 
         <div class="section">
-            <h2>Search Configuration</h2>
-            <div class="section-description">Choose the default engine, how the query is built, and an optional suffix like "watch" or "stream".</div>
+            <h2>Search Configuration <span id="profileSectionIndicator" style="font-size:13px;color:#888;font-weight:400;"></span></h2>
+            <div class="section-description">Choose the default engine, how the query is built, and an optional suffix like "watch" or "stream". These settings are per-profile.</div>
 
             <div class="form-grid">
                 <div class="form-group">
@@ -634,12 +667,12 @@
 
         <div class="section" id="menuItemsSection">
             <div class="section-header collapsible" id="menuItemsHeader">
-                <h2>Quick Search Menu Items</h2>
+                <h2>Quick Search Menu Items <span id="menuProfileIndicator" style="font-size:13px;color:#888;font-weight:400;"></span></h2>
                 <span class="collapse-chevron" id="menuItemsChevron"></span>
             </div>
             <div class="section-collapse-body" id="menuItemsBody">
                 <div class="section-description" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Quick-search menu entries that appear when you use reré on IMDb. You can rename, edit URLs, change query template, reorder, or delete any item.</span>
+                    <span>Quick-search menu entries for the active profile. You can rename, edit URLs, change query template, reorder, or delete any item.</span>
                     <button type="button" id="scrollToAddBtn" class="mini-btn">+ Add</button>
                 </div>
                 <div id="menuItemsList"></div>
