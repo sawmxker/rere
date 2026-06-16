@@ -514,6 +514,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchYandexWarning = document.getElementById("searchYandexWarning");
     const saveBtn = document.getElementById("saveBtn");
     const resetBtn = document.getElementById("resetBtn");
+    const exportTriggerBtn = document.getElementById("exportTriggerBtn");
+    const exportDropdown = document.getElementById("exportDropdown");
+    const importFileInput = document.getElementById("importFileInput");
     const status = document.getElementById("status");
 
     const defaultEngineNameInput = document.getElementById("defaultEngineName");
@@ -719,7 +722,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const nameInput = document.createElement("input");
         nameInput.type = "text";
         nameInput.value = engine.name;
-        nameInput.addEventListener("input", () => { engine.name = nameInput.value; render(); });
+        nameInput.addEventListener("input", () => { engine.name = nameInput.value; isDirty = true; updateSaveButtonState(); });
         nameWrap.appendChild(nameInput);
 
         const urlWrap = document.createElement("div");
@@ -728,7 +731,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const urlInput = document.createElement("input");
         urlInput.type = "text";
         urlInput.value = engine.url;
-        urlInput.addEventListener("input", () => { engine.url = urlInput.value; render(); });
+        urlInput.addEventListener("input", () => { engine.url = urlInput.value; isDirty = true; updateSaveButtonState(); });
         const help = document.createElement("div");
         help.className = "help-text";
         help.textContent = "If {query} is missing, it will be appended automatically. This may cause errors with non-standard search links.";
@@ -798,13 +801,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const nameInput = document.createElement("input");
         nameInput.type = "text";
         nameInput.value = item.name;
-        nameInput.addEventListener("input", () => { item.name = nameInput.value; render(); });
+        nameInput.addEventListener("input", () => { item.name = nameInput.value; isDirty = true; updateSaveButtonState(); });
         nameWrap.appendChild(nameInput);
 
         const queryWrap = document.createElement("div");
         queryWrap.innerHTML = `<label>Query Template</label>`;
         const querySelect = createQueryModeSelect(item.queryMode, item.usesSelectedEngine);
-        querySelect.addEventListener("change", () => { item.queryMode = querySelect.value; render(); });
+        querySelect.addEventListener("change", () => { item.queryMode = querySelect.value; isDirty = true; updateSaveButtonState(); });
         queryWrap.appendChild(querySelect);
 
         const urlWrap = document.createElement("div");
@@ -815,7 +818,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         urlInput.value = item.usesSelectedEngine
             ? (getSearchEngineById(state.searchEngineId)?.url || "")
             : item.url;
-        urlInput.addEventListener("input", () => { item.url = urlInput.value; item.usesSelectedEngine = false; render(); });
+        urlInput.addEventListener("input", () => { item.url = urlInput.value; item.usesSelectedEngine = false; isDirty = true; updateSaveButtonState(); });
         const help = document.createElement("div");
         help.className = "help-text";
         help.textContent = item.usesSelectedEngine
@@ -857,13 +860,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const nameInput = document.createElement("input");
         nameInput.type = "text";
         nameInput.value = item.name;
-        nameInput.addEventListener("input", () => { item.name = nameInput.value; render(); });
+        nameInput.addEventListener("input", () => { item.name = nameInput.value; isDirty = true; updateSaveButtonState(); });
         nameWrap.appendChild(nameInput);
 
         const queryWrap = document.createElement("div");
         queryWrap.innerHTML = `<label>Query Template</label>`;
         const querySelect = createQueryModeSelect(item.queryMode, false);
-        querySelect.addEventListener("change", () => { item.queryMode = querySelect.value; render(); });
+        querySelect.addEventListener("change", () => { item.queryMode = querySelect.value; isDirty = true; updateSaveButtonState(); });
         queryWrap.appendChild(querySelect);
 
         const urlWrap = document.createElement("div");
@@ -872,7 +875,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const urlInput = document.createElement("input");
         urlInput.type = "text";
         urlInput.value = item.url;
-        urlInput.addEventListener("input", () => { item.url = urlInput.value; render(); });
+        urlInput.addEventListener("input", () => { item.url = urlInput.value; isDirty = true; updateSaveButtonState(); });
         const help = document.createElement("div");
         help.className = "help-text";
         help.textContent = "If {query} is missing, it will be appended automatically. This may cause errors with non-standard search links.";
@@ -1385,6 +1388,148 @@ document.addEventListener("DOMContentLoaded", async () => {
             console.error("Error resetting settings:", error);
             showStatus("Error resetting settings", "error");
         }
+    });
+
+    function downloadJson(data, filename) {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function exportSettings() {
+        const profile = getActiveProfile();
+        if (profile) {
+            saveCurrentProfileToState();
+        }
+        const data = serializeSettings();
+        const timestamp = new Date().toISOString().slice(0, 10);
+        downloadJson(data, `rere-settings-${timestamp}.json`);
+        showStatus("Settings exported", "success");
+        closeExportDropdown();
+    }
+
+    function exportProfile() {
+        const profile = getActiveProfile();
+        if (!profile) return;
+        saveCurrentProfileToState();
+        const timestamp = new Date().toISOString().slice(0, 10);
+        const safeName = profile.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+        downloadJson({ ...profile }, `rere-profile-${safeName}-${timestamp}.json`);
+        showStatus(`Profile "${profile.name}" exported`, "success");
+        closeExportDropdown();
+    }
+
+    function addImportedProfile(profile) {
+        let newName = profile.name || "Imported";
+        const existingNames = Object.values(state.profiles).map(p => p.name);
+        if (existingNames.includes(newName)) {
+            let counter = 2;
+            while (existingNames.includes(newName + " (" + counter + ")")) {
+                counter++;
+            }
+            newName = newName + " (" + counter + ")";
+        }
+        const newId = makeId("imported");
+        state.profiles[newId] = {
+            id: newId,
+            name: newName,
+            site: SITE_OPTIONS.some(s => s.value === profile.site) ? profile.site : "\u2014",
+            suffix: typeof profile.suffix === "string" ? profile.suffix : state.suffix,
+            searchQueryMode: normalizeQueryMode(profile.searchQueryMode, state.searchQueryMode),
+            menuItems: Array.isArray(profile.menuItems)
+                ? profile.menuItems.map(m => normalizeMenuItem(m, DEFAULT_MENU_ITEMS[0]))
+                : state.menuItems.map(i => ({ ...i })),
+            customEngines: Array.isArray(profile.customEngines)
+                ? profile.customEngines.map(normalizeCustomEngine)
+                : []
+        };
+        return newId;
+    }
+
+    function importSettings(file) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                saveCurrentProfileToState();
+                let firstNewId = null;
+
+                // Merge search engines (add unique ones)
+                if (Array.isArray(data.searchEngines)) {
+                    for (const engine of data.searchEngines) {
+                        if (!state.searchEngines.some(e => e.id === engine.id)) {
+                            state.searchEngines.push(normalizeSearchEngine(engine, engine));
+                        }
+                    }
+                }
+
+                // Merge profiles (add as new, rename on clash)
+                if (data.profiles && typeof data.profiles === "object") {
+                    for (const [, profile] of Object.entries(data.profiles)) {
+                        const newId = addImportedProfile(profile);
+                        if (!firstNewId) firstNewId = newId;
+                    }
+                }
+
+                // Handle flat single-profile import
+                if (data.name && !data.profiles) {
+                    const newId = addImportedProfile(data);
+                    if (!firstNewId) firstNewId = newId;
+                }
+
+                if (firstNewId) {
+                    state.activeProfileId = firstNewId;
+                    loadProfileIntoState(state.profiles[firstNewId]);
+                }
+
+                await browser.storage.local.set(serializeSettings());
+                render();
+                isDirty = false;
+                updateSaveButtonState();
+                showStatus("Settings imported successfully!", "success");
+            } catch (err) {
+                console.error("Import error:", err);
+                showStatus("Failed to import settings: invalid file", "error");
+            }
+        };
+        reader.readAsText(file);
+        closeExportDropdown();
+    }
+
+    function closeExportDropdown() {
+        exportDropdown.classList.remove("show");
+        exportTriggerBtn.classList.remove("active");
+    }
+
+    exportTriggerBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        exportDropdown.classList.toggle("show");
+        exportTriggerBtn.classList.toggle("active");
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!e.target.closest(".save-group")) {
+            closeExportDropdown();
+        }
+    });
+
+    exportDropdown.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-action]");
+        if (!btn) return;
+        const action = btn.dataset.action;
+        if (action === "export") exportSettings();
+        else if (action === "import") importFileInput.click();
+        else if (action === "export-profile") exportProfile();
+    });
+
+    importFileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) importSettings(file);
+        importFileInput.value = "";
     });
 
 });

@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>reré: IMDb Quick ReSearching - Settings</title>
+    <title>reré: Quick ReSearching - Settings</title>
     <style>
         * {
             box-sizing: border-box;
@@ -310,6 +310,7 @@
         .btn-group {
             display: flex;
             flex-wrap: wrap;
+            align-items: center;
             gap: 12px;
             margin-top: 24px;
             padding-top: 16px;
@@ -321,13 +322,15 @@
 
         .btn {
             flex: 1;
-            padding: 12px 24px;
+            height: 40px;
+            padding: 0 24px;
             border: none;
             border-radius: 22px;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            line-height: 40px;
         }
 
         .btn-primary {
@@ -358,7 +361,7 @@
         }
 
         .status {
-            width: 100%;
+            flex: 0 0 100%;
             padding: 10px 12px;
             border-radius: 20px;
             display: none;
@@ -540,6 +543,91 @@
             color: var(--text);
         }
 
+        .save-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+            gap: 0;
+        }
+
+        .save-group .btn {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .btn-export-trigger {
+            width: 40px;
+            height: 40px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: var(--panel-muted);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            font-size: 18px;
+            line-height: 40px;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 6px;
+            transition: background 0.15s;
+            text-align: center;
+        }
+
+        .btn-export-trigger:hover {
+            background: var(--border-strong);
+        }
+
+        .btn-export-trigger.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .export-dropdown {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 6px;
+            min-width: 180px;
+            background: var(--panel);
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            overflow: hidden;
+            z-index: 100;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            opacity: 0;
+            transform: translateY(6px);
+            pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+
+        .export-dropdown.show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .export-dropdown button {
+            display: block;
+            width: 100%;
+            padding: 10px 14px;
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 13px;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .export-dropdown button:hover {
+            background: var(--panel-soft);
+        }
+
+        .export-dropdown button + button {
+            border-top: 1px solid var(--border);
+        }
+
         @media (max-width: 720px) {
             body {
                 padding: 20px 12px;
@@ -564,7 +652,7 @@
         <div class="page-header">
             <img src="../icons/icon48.png" alt="reré icon">
             <div>
-                <h1>reré: IMDb Quick ReSearching</h1>
+                <h1>reré: Quick ReSearching</h1>
                 <div class="subtitle">Customize default engines, quick menu items, query templates, and site favicons.</div>
             </div>
             <div class="profile-header">
@@ -734,8 +822,17 @@
         <div class="btn-group">
             <div id="status" class="status"></div>
             <button class="btn btn-secondary" id="resetBtn">Reset Defaults</button>
-            <button class="btn btn-primary" id="saveBtn">Save Settings</button>
+            <div class="save-group">
+                <button class="btn btn-primary" id="saveBtn">Save Settings</button>
+                <button class="btn-export-trigger" id="exportTriggerBtn" title="Export / Import">&#8943;</button>
+                <div class="export-dropdown" id="exportDropdown">
+                    <button data-action="export">Export JSON</button>
+                    <button data-action="import">Import JSON</button>
+                    <button data-action="export-profile">Export current profile</button>
+                </div>
+            </div>
         </div>
+        <input type="file" id="importFileInput" accept=".json" style="display:none">
     </div>
 
     <script src="options.js"></script>
