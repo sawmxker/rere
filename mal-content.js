@@ -10,7 +10,7 @@
     const DEFAULT_MENU_ITEMS = [
         { id: 'menu_search', name: 'Search in new tab', url: '__DEFAULT_ENGINE__', queryMode: 'titleYear', usesSelectedEngine: true, builtIn: true },
         { id: 'menu_youtube', name: 'Search YouTube', url: 'https://www.youtube.com/results?search_query={query}', queryMode: 'title', builtIn: true },
-        { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true },
+        { id: 'menu_imdb', name: 'Search IMDb', url: 'https://www.imdb.com/find/?q={query}', queryMode: 'titleYear', builtIn: true },
         { id: 'menu_archive', name: 'Search Archive.org', url: 'https://archive.org/search?query={query}', queryMode: 'title', builtIn: true },
         { id: 'menu_rutracker', name: 'Search RuTracker', url: 'https://rutracker.org/forum/tracker.php?nm={query}', queryMode: 'titleYear', builtIn: true }
     ];
