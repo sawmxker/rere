@@ -259,16 +259,27 @@
             e.stopPropagation();
             const { title, year } = getTitleAndYear();
             try {
-                const settings = normalizeSettings(await browser.storage.local.get(null));
+                const data = await browser.storage.local.get(null);
+                const profiles = data.profiles || {};
+                const hasAnySite = Object.values(profiles).some(p => p.site && p.site !== "\u2014");
+                const matchingEntry = Object.entries(profiles).find(([, p]) => p.site === "imdb");
+                if (!hasAnySite || !matchingEntry) {
+                    if (currentModal) { closeMenu(); return; }
+                    currentModal = createModal(title, year, getPosterUrl());
+                    document.body.appendChild(currentModal);
+                    document.body.style.overflow = 'hidden';
+                    return;
+                }
+                const settings = normalizeSettings(data, matchingEntry[0]);
                 const selectedEngine = getSelectedEngine(settings);
                 const query = buildQuery(title, year, settings.searchQueryMode, settings.suffix);
                 window.open(buildUrl(selectedEngine.url, query, settings, settings.searchQueryMode), '_blank');
             } catch (error) {
                 console.error('Error loading search settings:', error);
-                const fallbackSettings = normalizeSettings({});
-                const fallbackEngine = getSelectedEngine(fallbackSettings);
-                const query = buildQuery(title, year, 'titleYear', 'watch');
-                window.open(buildUrl(fallbackEngine.url, query, fallbackSettings, 'titleYear'), '_blank');
+                if (currentModal) { closeMenu(); return; }
+                currentModal = createModal(title, year, getPosterUrl());
+                document.body.appendChild(currentModal);
+                document.body.style.overflow = 'hidden';
             }
         };
 
@@ -472,7 +483,7 @@
         closeBtn.onclick = (e) => { e.stopPropagation(); closeMenu(); };
 
         const leftPanel = document.createElement('div');
-        leftPanel.style.cssText = 'width:220px;flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;padding:20px 0 20px 20px;';
+        leftPanel.style.cssText = 'width:220px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:20px 0 20px 20px;';
 
         const coverContainer = document.createElement('div');
         coverContainer.style.cssText = 'width:200px;position:relative;border-radius:6px;overflow:hidden;cursor:pointer;transform-style:preserve-3d;transition:transform 0.1s ease-out;';
@@ -497,6 +508,10 @@
         shine.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;border-radius:6px;pointer-events:none;background:linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%, rgba(0,0,0,0.04) 100%);';
         coverContainer.appendChild(shine);
 
+        coverContainer.addEventListener('mouseenter', () => {
+            coverContainer.style.transform = 'perspective(600px) translateY(-2px) scale3d(1.03,1.03,1.03)';
+            coverContainer.style.transition = 'transform 0.2s ease-out';
+        });
         coverContainer.addEventListener('mousemove', (e) => {
             const rect = coverContainer.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width;
@@ -516,29 +531,24 @@
 
         leftPanel.appendChild(coverContainer);
 
+        const profileSelect = document.createElement('select');
+        profileSelect.style.cssText = 'margin-top:14px;width:200px;font-size:12px;padding:2px 6px;border-radius:3px;border:1px solid #333;background:#1a1a1a;color:#fff;cursor:pointer;outline:none;';
+        leftPanel.appendChild(profileSelect);
+
         const rightPanel = document.createElement('div');
         rightPanel.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;';
 
         const header = document.createElement('div');
         header.style.cssText = 'padding:20px 48px 14px 24px;border-bottom:1px solid #333;';
 
-        const headerTop = document.createElement('div');
-        headerTop.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;';
-
         const h3 = document.createElement('h3');
-        h3.style.cssText = 'margin:0;color:#fff;font-size:20px;font-weight:500;';
+        h3.style.cssText = 'margin:0 0 6px 0;color:#fff;font-size:20px;font-weight:500;';
         h3.textContent = 'Quick rer\u00e9:Search';
-        headerTop.appendChild(h3);
-
-        const profileSelect = document.createElement('select');
-        profileSelect.style.cssText = 'font-size:12px;padding:2px 6px;border-radius:3px;border:1px solid #333;background:#1a1a1a;color:#fff;cursor:pointer;max-width:150px;outline:none;';
-        headerTop.appendChild(profileSelect);
+        header.appendChild(h3);
 
         const titleDiv = document.createElement('div');
         titleDiv.style.cssText = 'color:#aaa;font-size:14px;';
         titleDiv.textContent = year ? `${title} (${year})` : title;
-
-        header.appendChild(headerTop);
         header.appendChild(titleDiv);
 
         const listContainer = document.createElement('div');

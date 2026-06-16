@@ -13,10 +13,18 @@ const DEFAULT_MENU_ITEMS = [
     { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "titleYear", builtIn: true }
 ];
 
+const SITE_OPTIONS = [
+    { value: "\u2014", label: "\u2014" },
+    { value: "imdb", label: "imdb" },
+    { value: "mal-anime", label: "myanimelist.net anime" },
+    { value: "mal-manga", label: "myanimelist.net manga" }
+];
+
 const DEFAULT_PROFILES_CONFIG = [
     {
         id: "imdb",
         name: "IMDb",
+        site: "imdb",
         suffix: "watch",
         searchQueryMode: "titleYear",
         menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
@@ -25,6 +33,7 @@ const DEFAULT_PROFILES_CONFIG = [
     {
         id: "mal-anime",
         name: "MAL anime",
+        site: "mal-anime",
         suffix: "watch",
         searchQueryMode: "titleYear",
         menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
@@ -33,6 +42,7 @@ const DEFAULT_PROFILES_CONFIG = [
     {
         id: "mal-manga",
         name: "MAL manga",
+        site: "mal-manga",
         suffix: "read",
         searchQueryMode: "titleYear",
         menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
@@ -43,6 +53,7 @@ const DEFAULT_PROFILES_CONFIG = [
 function cloneProfileConfig(config) {
     return {
         ...config,
+        site: config.site || "\u2014",
         menuItems: config.menuItems.map(i => ({ ...i })),
         customEngines: config.customEngines.map(i => ({ ...i }))
     };
@@ -308,6 +319,7 @@ function normalizeSettings(raw) {
                 next.profiles[def.id] = {
                     id: def.id,
                     name: existing.name || def.name,
+                    site: SITE_OPTIONS.some(s => s.value === existing.site) ? existing.site : (def.site || "\u2014"),
                     suffix: typeof existing.suffix === "string" ? existing.suffix : def.suffix,
                     searchQueryMode: normalizeQueryMode(existing.searchQueryMode, def.searchQueryMode),
                     menuItems: Array.isArray(existing.menuItems) && existing.menuItems.length > 0
@@ -325,6 +337,7 @@ function normalizeSettings(raw) {
                 next.profiles[id] = {
                     id,
                     name: rp.name || id,
+                    site: SITE_OPTIONS.some(s => s.value === rp.site) ? rp.site : "\u2014",
                     suffix: typeof rp.suffix === "string" ? rp.suffix : DEFAULT_SETTINGS.suffix,
                     searchQueryMode: normalizeQueryMode(rp.searchQueryMode, DEFAULT_SETTINGS.searchQueryMode),
                     menuItems: Array.isArray(rp.menuItems)
@@ -380,6 +393,7 @@ function serializeSettings() {
         serializedProfiles[id] = {
             id: p.id,
             name: p.name,
+            site: p.site || "\u2014",
             suffix: p.suffix,
             searchQueryMode: p.searchQueryMode,
             menuItems: p.menuItems.map((item) => ({
@@ -532,9 +546,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const profileSelect = document.getElementById("profileSelect");
     const addProfileBtn = document.getElementById("addProfileBtn");
+    const editProfileBtn = document.getElementById("editProfileBtn");
     const deleteProfileBtn = document.getElementById("deleteProfileBtn");
     const profileSectionIndicator = document.getElementById("profileSectionIndicator");
     const menuProfileIndicator = document.getElementById("menuProfileIndicator");
+    const profileSiteSelect = document.getElementById("profileSiteSelect");
 
     function animateToggle(section, body) {
         if (section.classList.contains("collapsed")) {
@@ -929,6 +945,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         menuProfileIndicator.textContent = `(Profile: ${profileName})`;
     }
 
+    function findProfileBySite(site) {
+        if (!site || site === "\u2014") return null;
+        const ids = Object.keys(state.profiles);
+        for (const id of ids) {
+            const p = state.profiles[id];
+            if (p && p.site === site && id !== state.activeProfileId) return p;
+        }
+        return null;
+    }
+
+    function renderSiteSelect() {
+        const profile = getActiveProfile();
+        profileSiteSelect.innerHTML = "";
+        SITE_OPTIONS.forEach((opt) => {
+            const option = document.createElement("option");
+            option.value = opt.value;
+            option.textContent = opt.label;
+            if (profile && profile.site === opt.value) option.selected = true;
+            profileSiteSelect.appendChild(option);
+        });
+    }
+
     function render() {
         isDirty = true;
         updateEngineSelect();
@@ -940,6 +978,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateBuilderPreview();
         updateSaveButtonState();
         renderProfileSelect();
+        renderSiteSelect();
     }
 
     try {
@@ -1004,6 +1043,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const newProfile = {
             id,
             name: name.trim(),
+            site: "\u2014",
             suffix: DEFAULT_SETTINGS.suffix,
             searchQueryMode: DEFAULT_SETTINGS.searchQueryMode,
             menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
@@ -1031,6 +1071,37 @@ document.addEventListener("DOMContentLoaded", async () => {
         loadProfileIntoState(state.profiles[remainingIds[0]]);
         render();
         showStatus("Profile deleted", "success");
+    });
+
+    editProfileBtn.addEventListener("click", () => {
+        const profile = getActiveProfile();
+        if (!profile) return;
+        const newName = prompt("Edit profile name:", profile.name);
+        if (newName && newName.trim()) {
+            profile.name = newName.trim();
+            render();
+            showStatus("Profile renamed", "success");
+        }
+    });
+
+    profileSiteSelect.addEventListener("change", () => {
+        const newSite = profileSiteSelect.value;
+        if (!newSite) return;
+        const profile = getActiveProfile();
+        if (!profile) return;
+
+        const conflicting = findProfileBySite(newSite);
+        if (conflicting) {
+            if (!confirm(`Site "${newSite}" is already assigned to profile "${conflicting.name}". Remove it from "${conflicting.name}" and assign to "${profile.name}"?`)) {
+                renderSiteSelect();
+                return;
+            }
+            conflicting.site = "\u2014";
+        }
+
+        profile.site = newSite;
+        isDirty = true;
+        updateSaveButtonState();
     });
 
     defaultEngineUrlInput.addEventListener("input", updateBuilderPreview);
