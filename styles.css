@@ -61,3 +61,13 @@
 .imdb-search-menu-item:hover {
     background: #2c2c2c !important;
 }
+
+/* === MyAnimeList Styles === */
+
+#mal-search-btn {
+    font-family: Verdana, Arial;
+}
+
+#mal-search-btn a {
+    transition: background-color 0.15s, border-color 0.15s;
+}
