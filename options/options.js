@@ -9,7 +9,7 @@ const DEFAULT_MENU_ITEMS = [
     { id: "menu_search", name: "Search in new tab", url: "__DEFAULT_ENGINE__", queryMode: "titleYear", builtIn: true, usesSelectedEngine: true },
     { id: "menu_youtube", name: "Search YouTube", url: "https://www.youtube.com/results?search_query={query}", queryMode: "title", builtIn: true },
     { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true },
-    { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?query={query}", queryMode: "title", builtIn: true },
+    { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?tab=all&query={query}", queryMode: "title", builtIn: true },
     { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "titleYear", builtIn: true }
 ];
 
@@ -98,7 +98,15 @@ function createDefaultState() {
         menuItems: imdb.menuItems,
         customEngines: imdb.customEngines,
         profiles,
-        activeProfileId: "imdb"
+        activeProfileId: "imdb",
+        emptyProfilesByDefault: true,
+        collapseDefaultEngines: true,
+        collapseQuickSearchMenu: false,
+        imdbEnabled: true,
+        malEnabled: true,
+        contextMenuEnabled: true,
+        imdbButtonLabel: "reresearch",
+        malButtonLabel: "reresearch"
     };
 }
 
@@ -367,6 +375,21 @@ function normalizeSettings(raw) {
         next.activeProfileId = "imdb";
     }
 
+    if (typeof raw.emptyProfilesByDefault === "boolean") {
+        next.emptyProfilesByDefault = raw.emptyProfilesByDefault;
+    }
+    if (typeof raw.collapseDefaultEngines === "boolean") {
+        next.collapseDefaultEngines = raw.collapseDefaultEngines;
+    }
+    if (typeof raw.collapseQuickSearchMenu === "boolean") {
+        next.collapseQuickSearchMenu = raw.collapseQuickSearchMenu;
+    }
+    if (typeof raw.imdbEnabled === "boolean") next.imdbEnabled = raw.imdbEnabled;
+    if (typeof raw.malEnabled === "boolean") next.malEnabled = raw.malEnabled;
+    if (typeof raw.contextMenuEnabled === "boolean") next.contextMenuEnabled = raw.contextMenuEnabled;
+    if (raw.imdbButtonLabel === "search" || raw.imdbButtonLabel === "reresearch") next.imdbButtonLabel = raw.imdbButtonLabel;
+    if (raw.malButtonLabel === "search" || raw.malButtonLabel === "reresearch") next.malButtonLabel = raw.malButtonLabel;
+
     const active = next.profiles[next.activeProfileId];
     if (active) {
         next.suffix = active.suffix;
@@ -445,7 +468,15 @@ function serializeSettings() {
             queryMode: normalizeQueryMode(item.queryMode),
             iconUrl: item.iconUrl || ""
         })),
-        customSearchUrl: ""
+        customSearchUrl: "",
+        emptyProfilesByDefault: state.emptyProfilesByDefault,
+        collapseDefaultEngines: state.collapseDefaultEngines,
+        collapseQuickSearchMenu: state.collapseQuickSearchMenu,
+        imdbEnabled: state.imdbEnabled,
+        malEnabled: state.malEnabled,
+        contextMenuEnabled: state.contextMenuEnabled,
+        imdbButtonLabel: state.imdbButtonLabel,
+        malButtonLabel: state.malButtonLabel
     };
 }
 
@@ -981,6 +1012,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateSaveButtonState();
         renderProfileSelect();
         renderSiteSelect();
+        const toggle1 = document.getElementById("emptyProfilesToggle");
+        if (toggle1) toggle1.checked = state.emptyProfilesByDefault;
+        const toggle2 = document.getElementById("collapseDefaultToggle");
+        if (toggle2) toggle2.checked = state.collapseDefaultEngines;
+        const toggle3 = document.getElementById("collapseQuickToggle");
+        if (toggle3) toggle3.checked = state.collapseQuickSearchMenu;
+        defaultEnginesSection.classList.toggle("collapsed", state.collapseDefaultEngines);
+        menuItemsSection.classList.toggle("collapsed", state.collapseQuickSearchMenu);
+        const cb = (id) => document.getElementById(id);
+        const setChecked = (id, val) => { const e = cb(id); if (e) e.checked = val; };
+        const setVal = (id, val) => { const e = cb(id); if (e) e.value = val; };
+        setChecked("imdbEnabledToggle", state.imdbEnabled);
+        setChecked("malEnabledToggle", state.malEnabled);
+        setChecked("contextMenuToggle", state.contextMenuEnabled);
+        setVal("imdbButtonLabelSelect", state.imdbButtonLabel);
+        setVal("malButtonLabelSelect", state.malButtonLabel);
     }
 
     try {
@@ -988,14 +1035,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         render();
         isDirty = false;
         updateSaveButtonState();
-        defaultEnginesSection.classList.add("collapsed");
     } catch (error) {
         console.error("Error loading settings:", error);
         showStatus("Error loading settings", "error");
         render();
         isDirty = false;
         updateSaveButtonState();
-        defaultEnginesSection.classList.add("collapsed");
     }
 
     engineSelect.addEventListener("change", () => {
@@ -1050,7 +1095,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             site: "\u2014",
             suffix: DEFAULT_SETTINGS.suffix,
             searchQueryMode: DEFAULT_SETTINGS.searchQueryMode,
-            menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
+            menuItems: state.emptyProfilesByDefault ? [] : DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
             customEngines: []
         };
         state.profiles[id] = newProfile;
@@ -1126,7 +1171,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         state.searchEngines.push({ id: makeId("engine"), name, url: ensureQueryPlaceholder(url), builtIn: false });
         defaultEngineNameInput.value = "";
         defaultEngineUrlInput.value = "";
+        isDirty = true;
         render();
+        updateSaveButtonState();
         showStatus("Default search engine added to the draft list", "success");
     });
 
@@ -1146,7 +1193,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         customEngineNameInput.value = "";
         customEngineUrlInput.value = "";
         customEngineQueryModeSelect.value = "titleYear";
+        isDirty = true;
         render();
+        updateSaveButtonState();
         showStatus("Search engine added to the draft list", "success");
     });
 
@@ -1701,6 +1750,62 @@ document.addEventListener("DOMContentLoaded", async () => {
         const file = e.target.files[0];
         if (file) importSettings(file);
         importFileInput.value = "";
+    });
+
+    const emptyToggle = document.getElementById("emptyProfilesToggle");
+    if (emptyToggle) {
+        emptyToggle.addEventListener("change", () => {
+            state.emptyProfilesByDefault = emptyToggle.checked;
+            isDirty = true;
+            updateSaveButtonState();
+        });
+    }
+
+    const collapseDefaultToggle = document.getElementById("collapseDefaultToggle");
+    if (collapseDefaultToggle) {
+        collapseDefaultToggle.addEventListener("change", () => {
+            state.collapseDefaultEngines = collapseDefaultToggle.checked;
+            defaultEnginesSection.classList.toggle("collapsed", state.collapseDefaultEngines);
+            isDirty = true;
+            updateSaveButtonState();
+        });
+    }
+
+    const collapseQuickToggle = document.getElementById("collapseQuickToggle");
+    if (collapseQuickToggle) {
+        collapseQuickToggle.addEventListener("change", () => {
+            state.collapseQuickSearchMenu = collapseQuickToggle.checked;
+            menuItemsSection.classList.toggle("collapsed", state.collapseQuickSearchMenu);
+            isDirty = true;
+            updateSaveButtonState();
+        });
+    }
+
+    function bindToggle(id, key) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("change", () => { state[key] = el.checked; isDirty = true; updateSaveButtonState(); });
+    }
+    function bindSelect(id, key) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("change", () => { state[key] = el.value; isDirty = true; updateSaveButtonState(); });
+    }
+    bindToggle("imdbEnabledToggle", "imdbEnabled");
+    bindToggle("malEnabledToggle", "malEnabled");
+    bindToggle("contextMenuToggle", "contextMenuEnabled");
+    bindSelect("imdbButtonLabelSelect", "imdbButtonLabel");
+    bindSelect("malButtonLabelSelect", "malButtonLabel");
+
+    // Tab switching
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+            btn.classList.add("active");
+            const panel = document.getElementById("tab" + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1));
+            if (panel) panel.classList.add("active");
+        });
     });
 
     // Handle hash auto-import on page load

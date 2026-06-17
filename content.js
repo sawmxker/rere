@@ -12,7 +12,7 @@
         { id: 'menu_search', name: 'Search in new tab', url: '__DEFAULT_ENGINE__', queryMode: 'titleYear', usesSelectedEngine: true, builtIn: true },
         { id: 'menu_youtube', name: 'Search YouTube', url: 'https://www.youtube.com/results?search_query={query}', queryMode: 'title', builtIn: true },
         { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true },
-        { id: 'menu_archive', name: 'Search Archive.org', url: 'https://archive.org/search?query={query}', queryMode: 'title', builtIn: true },
+        { id: 'menu_archive', name: 'Search Archive.org', url: 'https://archive.org/search?tab=all&query={query}', queryMode: 'title', builtIn: true },
         { id: 'menu_rutracker', name: 'Search RuTracker', url: 'https://rutracker.org/forum/tracker.php?nm={query}', queryMode: 'titleYear', builtIn: true }
     ];
 
@@ -124,7 +124,7 @@
             if (profile) {
                 suffix = typeof profile.suffix === 'string' ? profile.suffix : suffix;
                 searchQueryMode = normalizeQueryMode(profile.searchQueryMode, searchQueryMode);
-                menuItems = Array.isArray(profile.menuItems) && profile.menuItems.length > 0
+                menuItems = Array.isArray(profile.menuItems)
                     ? profile.menuItems.map((item, index) => normalizeMenuItem(item, DEFAULT_MENU_ITEMS[index] || DEFAULT_MENU_ITEMS[0]))
                     : menuItems;
                 customEngines = Array.isArray(profile.customEngines)
@@ -249,7 +249,7 @@
         const textDiv = document.createElement('div');
         textDiv.className = 'ipc-btn__text';
         const searchDiv = document.createElement('div');
-        searchDiv.textContent = 'rer\u00e9:Search';
+        searchDiv.textContent = "rer\u00e9:Search";
         textDiv.appendChild(searchDiv);
         mainBtn.appendChild(icon);
         mainBtn.appendChild(textDiv);
@@ -326,6 +326,11 @@
     function addButton() {
         if (document.querySelector('#imdb-search-btn')) return;
         const btn = createButton();
+        browser.storage.local.get(["imdbEnabled", "imdbButtonLabel"]).then(data => {
+            if (data.imdbEnabled === false) { btn.remove(); return; }
+            const sd = btn.querySelector('.ipc-btn__text div');
+            if (sd) sd.textContent = data.imdbButtonLabel === "search" ? "Search" : "rer\u00e9:Search";
+        });
         const wlBtn = document.querySelector('[data-testid="tm-box-wl-button"]');
         if (wlBtn) {
             const container = wlBtn.closest('.sc-dcb1530e-3') || wlBtn.parentElement?.parentElement;

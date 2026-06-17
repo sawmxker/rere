@@ -11,7 +11,7 @@
         { id: 'menu_search', name: 'Search in new tab', url: '__DEFAULT_ENGINE__', queryMode: 'titleYear', usesSelectedEngine: true, builtIn: true },
         { id: 'menu_youtube', name: 'Search YouTube', url: 'https://www.youtube.com/results?search_query={query}', queryMode: 'title', builtIn: true },
         { id: 'menu_imdb', name: 'Search IMDb', url: 'https://www.imdb.com/find/?q={query}', queryMode: 'titleYear', builtIn: true },
-        { id: 'menu_archive', name: 'Search Archive.org', url: 'https://archive.org/search?query={query}', queryMode: 'title', builtIn: true },
+        { id: 'menu_archive', name: 'Search Archive.org', url: 'https://archive.org/search?tab=all&query={query}', queryMode: 'title', builtIn: true },
         { id: 'menu_rutracker', name: 'Search RuTracker', url: 'https://rutracker.org/forum/tracker.php?nm={query}', queryMode: 'titleYear', builtIn: true }
     ];
 
@@ -142,7 +142,7 @@
             if (profile) {
                 suffix = typeof profile.suffix === 'string' ? profile.suffix : suffix;
                 searchQueryMode = normalizeQueryMode(profile.searchQueryMode, searchQueryMode);
-                menuItems = Array.isArray(profile.menuItems) && profile.menuItems.length > 0
+                menuItems = Array.isArray(profile.menuItems)
                     ? profile.menuItems.map((item, index) => normalizeMenuItem(item, DEFAULT_MENU_ITEMS[index] || DEFAULT_MENU_ITEMS[0]))
                     : menuItems;
                 customEngines = Array.isArray(profile.customEngines)
@@ -269,7 +269,7 @@
         mainBtn.appendChild(searchIcon);
 
         const txt = document.createElement('span');
-        txt.textContent = 'reré: search';
+        txt.textContent = 'rer\u00e9: search';
         mainBtn.appendChild(txt);
 
         const dropdownBtn = document.createElement('a');
@@ -352,6 +352,11 @@
     function addButton() {
         if (document.querySelector('#mal-search-btn')) return;
         const btn = createButton();
+        browser.storage.local.get(["malEnabled", "malButtonLabel"]).then(data => {
+            if (data.malEnabled === false) { btn.remove(); return; }
+            const span = btn.querySelector('span');
+            if (span) span.textContent = data.malButtonLabel === "search" ? "Search" : "rer\u00e9: search";
+        });
 
         const favSection = document.querySelector('#profileRows.pt0') ||
                           document.querySelector('#profileRows');

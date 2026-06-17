@@ -5,6 +5,7 @@ async function updateContextMenus() {
     await browser.contextMenus.removeAll();
 
     const data = await browser.storage.local.get(null);
+    if (data.contextMenuEnabled === false) return;
     const profiles = data.profiles || {};
     const entries = Object.entries(profiles);
     if (entries.length === 0) return;
