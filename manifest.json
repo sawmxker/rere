@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "reré: IMDb Quick ReSearching",
-  "version": "0.1.74",
+  "version": "0.1.76",
   "description": "Adds convenient search buttons to IMDb.",
 
-  "permissions": ["tabs", "storage", "activeTab"],
+  "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
   "host_permissions": ["*://www.imdb.com/*", "*://myanimelist.net/*"],
 
   "browser_specific_settings": {
@@ -16,6 +16,10 @@
         "optional": []
       }
     }
+  },
+
+  "background": {
+    "scripts": ["background.js"]
   },
 
   "content_scripts": [

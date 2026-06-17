@@ -249,7 +249,7 @@
         const textDiv = document.createElement('div');
         textDiv.className = 'ipc-btn__text';
         const searchDiv = document.createElement('div');
-        searchDiv.textContent = 'Search';
+        searchDiv.textContent = 'rer\u00e9:Search';
         textDiv.appendChild(searchDiv);
         mainBtn.appendChild(icon);
         mainBtn.appendChild(textDiv);
