@@ -13,15 +13,15 @@ function normalizeSettings(raw) {
     let suffix = typeof raw.suffix === "string" ? raw.suffix : "watch";
     let searchQueryMode = raw.searchQueryMode === "title" ? "title" : "titleYear";
     let activeProfileId = raw.activeProfileId || "";
-    let activeProfileName = "";
+    let profileCount = 0;
 
     if (raw.profiles) {
         const profile = raw.profiles[activeProfileId] || raw.profiles["imdb"];
         if (profile) {
             suffix = typeof profile.suffix === "string" ? profile.suffix : suffix;
             searchQueryMode = profile.searchQueryMode === "title" ? "title" : "titleYear";
-            activeProfileName = profile.name || "";
         }
+        profileCount = Object.keys(raw.profiles).length;
     }
 
     return {
@@ -29,7 +29,7 @@ function normalizeSettings(raw) {
         searchEngineId,
         searchQueryMode,
         searchEngines,
-        activeProfileName
+        profileCount
     };
 }
 
@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const settings = normalizeSettings(await browser.storage.local.get(null));
         const currentEngine = settings.searchEngines.find((engine) => engine.id === settings.searchEngineId);
 
-        document.getElementById("currentProfile").textContent = settings.activeProfileName || "IMDb";
+        document.getElementById("profileCount").textContent = settings.profileCount;
         document.getElementById("currentEngine").textContent = currentEngine?.name || "Google";
         document.getElementById("currentQueryMode").textContent =
             settings.searchQueryMode === "title" ? "title" : "title+year";

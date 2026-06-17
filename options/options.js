@@ -583,7 +583,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         status.className = `status ${type}`;
         setTimeout(() => {
             status.className = "status";
-        }, 3000);
+        }, 5000);
     }
 
     function setWarning(container, visible) {
@@ -971,7 +971,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function render() {
-        isDirty = true;
         updateEngineSelect();
         searchQueryModeSelect.value = state.searchQueryMode;
         suffixInput.value = state.suffix;
@@ -1001,6 +1000,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     engineSelect.addEventListener("change", () => {
         state.searchEngineId = engineSelect.value;
+        isDirty = true;
+        updateSaveButtonState();
         render();
     });
 
@@ -1423,7 +1424,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         closeExportDropdown();
     }
 
+    function isProfileDuplicate(profile) {
+        const normalized = {
+            site: SITE_OPTIONS.some(s => s.value === profile.site) ? profile.site : "\u2014",
+            suffix: typeof profile.suffix === "string" ? profile.suffix : state.suffix,
+            searchQueryMode: normalizeQueryMode(profile.searchQueryMode, state.searchQueryMode),
+            menuItems: Array.isArray(profile.menuItems)
+                ? profile.menuItems.map(m => normalizeMenuItem(m, DEFAULT_MENU_ITEMS[0]))
+                : null,
+            customEngines: Array.isArray(profile.customEngines)
+                ? profile.customEngines.map(normalizeCustomEngine)
+                : []
+        };
+        const needle = JSON.stringify(normalized);
+        return Object.values(state.profiles).some(p => {
+            const existing = {
+                site: p.site,
+                suffix: p.suffix,
+                searchQueryMode: p.searchQueryMode,
+                menuItems: p.menuItems,
+                customEngines: p.customEngines
+            };
+            return JSON.stringify(existing) === needle;
+        });
+    }
+
     function addImportedProfile(profile) {
+        if (isProfileDuplicate(profile)) return null;
+
         let newName = profile.name || "Imported";
         const existingNames = Object.values(state.profiles).map(p => p.name);
         if (existingNames.includes(newName)) {
@@ -1500,6 +1528,111 @@ document.addEventListener("DOMContentLoaded", async () => {
         closeExportDropdown();
     }
 
+    function encodeSettings(obj) {
+        const bytes = new TextEncoder().encode(JSON.stringify(obj));
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return "rere:import:" + btoa(binary);
+    }
+
+    function decodeSettings(str) {
+        const prefix = "rere:import:";
+        let encoded = str;
+        if (encoded.startsWith(prefix)) {
+            encoded = encoded.slice(prefix.length);
+        }
+        encoded = encoded.trim();
+        const binary = atob(encoded);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return JSON.parse(new TextDecoder().decode(bytes));
+    }
+
+    function importData(data) {
+        saveCurrentProfileToState();
+        let firstNewId = null;
+        let added = 0;
+        let skipped = 0;
+
+        if (Array.isArray(data.searchEngines)) {
+            for (const engine of data.searchEngines) {
+                if (!state.searchEngines.some(e => e.id === engine.id)) {
+                    state.searchEngines.push(normalizeSearchEngine(engine, engine));
+                }
+            }
+        }
+
+        if (data.profiles && typeof data.profiles === "object") {
+            for (const [, profile] of Object.entries(data.profiles)) {
+                const newId = addImportedProfile(profile);
+                if (newId) { added++; if (!firstNewId) firstNewId = newId; }
+                else skipped++;
+            }
+        }
+
+        if (data.name && !data.profiles) {
+            const newId = addImportedProfile(data);
+            if (newId) { added++; if (!firstNewId) firstNewId = newId; }
+            else skipped++;
+        }
+
+        return { firstNewId, added, skipped };
+    }
+
+    function importSettings(file) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                const { firstNewId, added, skipped } = importData(data);
+                if (firstNewId) {
+                    state.activeProfileId = firstNewId;
+                    loadProfileIntoState(state.profiles[firstNewId]);
+                }
+                await browser.storage.local.set(serializeSettings());
+                render();
+                isDirty = false;
+                updateSaveButtonState();
+                const parts = [];
+                if (added > 0) parts.push(added + " profile(s) added");
+                if (skipped > 0) parts.push(skipped + " duplicate(s) skipped");
+                showStatus("Settings imported: " + (parts.join(", ") || "no changes"), "success");
+            } catch (err) {
+                console.error("Import error:", err);
+                showStatus("Failed to import settings: invalid file", "error");
+            }
+        };
+        reader.readAsText(file);
+        closeExportDropdown();
+    }
+
+    function importFromStr(str) {
+        try {
+            const data = decodeSettings(str);
+            const { firstNewId, added, skipped } = importData(data);
+            if (firstNewId) {
+                state.activeProfileId = firstNewId;
+                loadProfileIntoState(state.profiles[firstNewId]);
+            }
+            browser.storage.local.set(serializeSettings()).then(() => {
+                render();
+                isDirty = false;
+                updateSaveButtonState();
+                const parts = [];
+                if (added > 0) parts.push(added + " profile(s) added");
+                if (skipped > 0) parts.push(skipped + " duplicate(s) skipped");
+                showStatus("Imported from link: " + (parts.join(", ") || "no changes"), "success");
+            });
+        } catch (err) {
+            console.error("Import from link error:", err);
+            showStatus("Failed to parse import link", "error");
+        }
+    }
+
     function closeExportDropdown() {
         exportDropdown.classList.remove("show");
         exportTriggerBtn.classList.remove("active");
@@ -1524,6 +1657,44 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (action === "export") exportSettings();
         else if (action === "import") importFileInput.click();
         else if (action === "export-profile") exportProfile();
+        else if (action === "copy-link") {
+            const profile = getActiveProfile();
+            if (profile) saveCurrentProfileToState();
+            const data = serializeSettings();
+            const link = encodeSettings(data);
+            navigator.clipboard.writeText(link).then(() => {
+                showStatus("Import link copied to clipboard", "success");
+            }).catch(() => {
+                showStatus("Failed to copy to clipboard", "error");
+            });
+            closeExportDropdown();
+        } else if (action === "paste-import") {
+            openPasteModal();
+        } else if (action === "paste-clipboard") {
+            navigator.clipboard.readText().then(text => {
+                const val = text.trim();
+                if (!val) {
+                    showStatus("Clipboard is empty", "error");
+                    return;
+                }
+                importFromStr(val);
+            }).catch(() => {
+                showStatus("Cannot read clipboard. Grant permission or paste via Ctrl+V.", "error");
+            });
+            closeExportDropdown();
+        } else if (action === "copy-profile") {
+            saveCurrentProfileToState();
+            const profile = getActiveProfile();
+            if (profile) {
+                const link = encodeSettings(profile);
+                navigator.clipboard.writeText(link).then(() => {
+                    showStatus('Profile "' + profile.name + '" link copied', "success");
+                }).catch(() => {
+                    showStatus("Failed to copy to clipboard", "error");
+                });
+            }
+            closeExportDropdown();
+        }
     });
 
     importFileInput.addEventListener("change", (e) => {
@@ -1531,5 +1702,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (file) importSettings(file);
         importFileInput.value = "";
     });
+
+    // Handle hash auto-import on page load
+    if (window.location.hash.startsWith("#import=")) {
+        const encoded = window.location.hash.slice("#import=".length);
+        try {
+            const data = decodeSettings(encoded);
+            browser.storage.local.get(null).then((saved) => {
+                Object.assign(state, normalizeSettings(saved));
+                    const { firstNewId, added, skipped } = importData(data);
+                    if (firstNewId) {
+                        state.activeProfileId = firstNewId;
+                        loadProfileIntoState(state.profiles[firstNewId]);
+                    }
+                    browser.storage.local.set(serializeSettings()).then(() => {
+                        render();
+                        isDirty = false;
+                        updateSaveButtonState();
+                        const parts = [];
+                        if (added > 0) parts.push(added + " profile(s) added");
+                        if (skipped > 0) parts.push(skipped + " duplicate(s) skipped");
+                        showStatus("Auto-imported: " + (parts.join(", ") || "no changes"), "success");
+                    history.replaceState(null, "", window.location.pathname);
+                });
+            });
+        } catch (err) {
+            console.error("Hash auto-import error:", err);
+            showStatus("Failed to auto-import from URL", "error");
+        }
+    }
 
 });
