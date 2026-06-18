@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "reré: Quick ReSearching",
-  "version": "0.1.88",
+  "version": "0.1.94",
   "description": "Adds convenient search buttons to IMDb and MyAnimeList, with profiles, per-site settings, and context menu.",
 
   "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
@@ -19,18 +19,18 @@
   },
 
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["storage.js", "background.js"]
   },
 
   "content_scripts": [
     {
       "matches": ["*://www.imdb.com/title/*"],
-      "js": ["content.js"],
+      "js": ["storage.js", "content.js"],
       "css": ["styles.css"]
     },
     {
       "matches": ["*://myanimelist.net/anime/*", "*://myanimelist.net/manga/*"],
-      "js": ["mal-content.js"],
+      "js": ["storage.js", "mal-content.js"],
       "css": ["styles.css"]
     }
   ],

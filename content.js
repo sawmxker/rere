@@ -258,9 +258,9 @@
             e.preventDefault();
             e.stopPropagation();
             const { title, year } = getTitleAndYear();
-            try {
-                const data = await browser.storage.local.get(null);
-                const profiles = data.profiles || {};
+    try {
+        const data = await storageGet(null);
+        const profiles = data.profiles || {};
                 const hasAnySite = Object.values(profiles).some(p => p.site && p.site !== "\u2014");
                 const matchingEntry = Object.entries(profiles).find(([, p]) => p.site === "imdb");
                 if (!hasAnySite || !matchingEntry) {
@@ -326,7 +326,7 @@
     function addButton() {
         if (document.querySelector('#imdb-search-btn')) return;
         const btn = createButton();
-        browser.storage.local.get(["imdbEnabled", "imdbButtonLabel"]).then(data => {
+        storageGet(["imdbEnabled", "imdbButtonLabel"]).then(data => {
             if (data.imdbEnabled === false) { btn.remove(); return; }
             const sd = btn.querySelector('.ipc-btn__text div');
             if (sd) sd.textContent = data.imdbButtonLabel === "search" ? "Search" : "rer\u00e9:Search";
@@ -421,7 +421,7 @@
 
     async function getMenuItems(title, year, overrideProfileId) {
         try {
-            const settings = normalizeSettings(await browser.storage.local.get(null), overrideProfileId);
+            const settings = normalizeSettings(await storageGet(null), overrideProfileId);
             const items = [];
             settings.menuItems.forEach((item) => {
                 const mode = item.usesSelectedEngine && item.queryMode === 'configured' ? settings.searchQueryMode : item.queryMode;
@@ -579,7 +579,7 @@
             });
         }
 
-        browser.storage.local.get(null).then((data) => {
+        storageGet(null).then((data) => {
             const currentProfileId = getProfileIdForHost();
             const profiles = data.profiles || {};
             const allIds = Object.keys(profiles);

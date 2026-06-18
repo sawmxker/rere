@@ -306,7 +306,7 @@
             e.stopPropagation();
             const { title, year } = getTitleAndYear();
             try {
-                const data = await browser.storage.local.get(null);
+                const data = await storageGet(null);
                 const profiles = data.profiles || {};
                 const hasAnySite = Object.values(profiles).some(p => p.site && p.site !== "\u2014");
                 const currentSite = getSiteForCurrentPage();
@@ -352,7 +352,7 @@
     function addButton() {
         if (document.querySelector('#mal-search-btn')) return;
         const btn = createButton();
-        browser.storage.local.get(["malEnabled", "malButtonLabel"]).then(data => {
+        storageGet(["malEnabled", "malButtonLabel"]).then(data => {
             if (data.malEnabled === false) { btn.remove(); return; }
             const span = btn.querySelector('span');
             if (span) span.textContent = data.malButtonLabel === "search" ? "Search" : "rer\u00e9: search";
@@ -448,7 +448,7 @@
 
     async function getMenuItems(title, year, overrideProfileId) {
         try {
-            const settings = normalizeSettings(await browser.storage.local.get(null), overrideProfileId);
+            const settings = normalizeSettings(await storageGet(null), overrideProfileId);
             const items = [];
             settings.menuItems.forEach((item) => {
                 const mode = item.usesSelectedEngine && item.queryMode === 'configured' ? settings.searchQueryMode : item.queryMode;
@@ -613,7 +613,7 @@
             });
         }
 
-        browser.storage.local.get(null).then((data) => {
+        storageGet(null).then((data) => {
             const currentProfileId = getProfileIdForHost();
             const profiles = data.profiles || {};
             const allIds = Object.keys(profiles);

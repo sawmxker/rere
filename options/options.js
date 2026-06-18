@@ -16,8 +16,8 @@ const DEFAULT_MENU_ITEMS = [
 const SITE_OPTIONS = [
     { value: "\u2014", label: "\u2014" },
     { value: "imdb", label: "imdb" },
-    { value: "mal-anime", label: "myanimelist.net anime" },
-    { value: "mal-manga", label: "myanimelist.net manga" }
+    { value: "mal-anime", label: "myanimelist.net/anime" },
+    { value: "mal-manga", label: "myanimelist.net/manga" }
 ];
 
 const DEFAULT_PROFILES_CONFIG = [
@@ -1193,7 +1193,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     try {
-        state = normalizeSettings(await browser.storage.local.get(null));
+        state = normalizeSettings(await storageGet(null));
         render();
         isDirty = false;
         updateSaveButtonState();
@@ -1204,6 +1204,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         isDirty = false;
         updateSaveButtonState();
     }
+
+    // Listen for sync-pulled changes from background
+    browser.storage.onChanged.addListener(async (changes, area) => {
+        if (area !== "local") return;
+        if (!changes._syncMeta) return;
+        const relevant = Object.keys(changes).some(k =>
+            k !== "_syncMeta"
+        );
+        if (!relevant) return;
+        if (isDirty) {
+            showStatus("Settings updated from another device — save or reload to see changes.", "warning");
+        } else {
+            state = normalizeSettings(await storageGet(null));
+            render();
+            isDirty = false;
+            updateSaveButtonState();
+            showStatus("Settings synced from another device", "success");
+        }
+    });
 
     engineSelect.addEventListener("change", () => {
         state.searchEngineId = engineSelect.value;
@@ -1568,7 +1587,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         try {
-            await browser.storage.local.set(serializeSettings());
+            await storageSet(serializeSettings());
             showStatus("Settings saved successfully!", "success");
             render();
             isDirty = false;
@@ -1586,7 +1605,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         try {
             state = createDefaultState();
-            await browser.storage.local.set(serializeSettings());
+            await storageSet(serializeSettings());
             defaultEngineNameInput.value = "";
             defaultEngineUrlInput.value = "";
             customEngineNameInput.value = "";
@@ -1725,7 +1744,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     loadProfileIntoState(state.profiles[firstNewId]);
                 }
 
-                await browser.storage.local.set(serializeSettings());
+                await storageSet(serializeSettings());
                 render();
                 isDirty = false;
                 updateSaveButtonState();
@@ -1804,7 +1823,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     state.activeProfileId = firstNewId;
                     loadProfileIntoState(state.profiles[firstNewId]);
                 }
-                await browser.storage.local.set(serializeSettings());
+                await storageSet(serializeSettings());
                 render();
                 isDirty = false;
                 updateSaveButtonState();
@@ -1829,7 +1848,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 state.activeProfileId = firstNewId;
                 loadProfileIntoState(state.profiles[firstNewId]);
             }
-            browser.storage.local.set(serializeSettings()).then(() => {
+            storageSet(serializeSettings()).then(() => {
                 render();
                 isDirty = false;
                 updateSaveButtonState();
@@ -1943,6 +1962,50 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
+    const syncToggle = document.getElementById("syncEnabledToggle");
+    const syncStatus = document.getElementById("syncStatus");
+    if (syncToggle) {
+        storageGetSyncEnabled().then(enabled => {
+            syncToggle.checked = enabled;
+        });
+        syncToggle.addEventListener("change", async () => {
+            const enable = syncToggle.checked;
+            if (enable) {
+                const data = serializeSettings();
+                const currentSyncEnabled = await storageGetSyncEnabled();
+                if (!currentSyncEnabled) {
+                    syncStatus.textContent = "Migrating data to Firefox Sync\u2026";
+                    syncStatus.style.display = "block";
+                    try {
+                        await storageSet(data);
+                        await storageMigrateLocalToSync();
+                        await storageSetSyncEnabled(true);
+                        syncStatus.textContent = "Sync enabled. Your data will now sync across devices.";
+                        setTimeout(() => { syncStatus.style.display = "none"; }, 4000);
+                    } catch (err) {
+                        syncToggle.checked = false;
+                        syncStatus.textContent = "Sync error: " + err.message;
+                        syncStatus.style.display = "block";
+                    }
+                }
+            } else {
+                syncStatus.textContent = "Migrating data to local storage\u2026";
+                syncStatus.style.display = "block";
+                try {
+                    await storageSet(serializeSettings());
+                    await storageMigrateSyncToLocal();
+                    await storageSetSyncEnabled(false);
+                    syncStatus.textContent = "Sync disabled. Data is now stored locally only.";
+                    setTimeout(() => { syncStatus.style.display = "none"; }, 4000);
+                } catch (err) {
+                    syncToggle.checked = true;
+                    syncStatus.textContent = "Migration error: " + err.message;
+                    syncStatus.style.display = "block";
+                }
+            }
+        });
+    }
+
     function bindToggle(id, key) {
         const el = document.getElementById(id);
         if (!el) return;
@@ -1975,14 +2038,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         const encoded = window.location.hash.slice("#import=".length);
         try {
             const data = decodeSettings(encoded);
-            browser.storage.local.get(null).then((saved) => {
+            storageGet(null).then((saved) => {
                 Object.assign(state, normalizeSettings(saved));
                     const { firstNewId, added, skipped } = importData(data);
                     if (firstNewId) {
                         state.activeProfileId = firstNewId;
                         loadProfileIntoState(state.profiles[firstNewId]);
                     }
-                    browser.storage.local.set(serializeSettings()).then(() => {
+                    storageSet(serializeSettings()).then(() => {
                         render();
                         isDirty = false;
                         updateSaveButtonState();

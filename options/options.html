@@ -1047,6 +1047,20 @@
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
+
+                <h3 style="margin:20px 0 12px 0;font-size:15px;color:var(--accent);">Sync</h3>
+
+                <div class="toggle-row">
+                    <div>
+                        <div class="toggle-label">Firefox Sync</div>
+                        <div class="toggle-desc">Sync your profiles, search engines, and settings across devices using Firefox Sync. Limited to 100 KB total — large datasets may not fit.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="syncEnabledToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div id="syncStatus" class="help-text" style="margin:4px 16px 0 16px;display:none;"></div>
             </div>
         </div>
 
@@ -1069,6 +1083,7 @@
         <input type="file" id="importFileInput" accept=".json" style="display:none">
     </div>
 
+    <script src="../storage.js"></script>
     <script src="options.js"></script>
 </body>
 </html>

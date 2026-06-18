@@ -35,7 +35,7 @@ function normalizeSettings(raw) {
 
 document.addEventListener("DOMContentLoaded", async () => {
     try {
-        const settings = normalizeSettings(await browser.storage.local.get(null));
+        const settings = normalizeSettings(await storageGet(null));
         const currentEngine = settings.searchEngines.find((engine) => engine.id === settings.searchEngineId);
 
         document.getElementById("profileCount").textContent = settings.profileCount;
@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     document.getElementById("resetDefaults").onclick = async () => {
         if (confirm("Reset all settings to defaults?")) {
-            await browser.storage.local.clear();
+            await storageClear();
             location.reload();
         }
     };

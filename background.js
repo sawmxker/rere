@@ -1,10 +1,19 @@
-browser.runtime.onInstalled.addListener(updateContextMenus);
-browser.storage.onChanged.addListener(updateContextMenus);
+browser.runtime.onInstalled.addListener(() => setTimeout(updateContextMenus, 500));
+browser.storage.onChanged.addListener((changes, areaName) => {
+    storageInvalidateSyncCache();
+    storageGetSyncEnabled().then(syncEnabled => {
+        if (syncEnabled && areaName === "sync") {
+            storagePullFromSync().then(() => updateContextMenus());
+        } else if (!syncEnabled && areaName === "local") {
+            updateContextMenus();
+        }
+    });
+});
 
 async function updateContextMenus() {
     await browser.contextMenus.removeAll();
 
-    const data = await browser.storage.local.get(null);
+    const data = await storageGet(null);
     if (data.contextMenuEnabled === false) return;
     const profiles = data.profiles || {};
     const entries = Object.entries(profiles);
@@ -71,7 +80,7 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
 
     if (type !== "p" && type !== "m") return;
 
-    browser.storage.local.get(null).then(data => {
+    storageGet(null).then(data => {
         const profiles = data.profiles || {};
         const profile = profiles[profileId];
         if (!profile) return;
