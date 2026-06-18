@@ -10,7 +10,7 @@ const DEFAULT_MENU_ITEMS = [
     { id: "menu_youtube", name: "Search YouTube", url: "https://www.youtube.com/results?search_query={query}", queryMode: "title", builtIn: true },
     { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true },
     { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?tab=all&query={query}", queryMode: "title", builtIn: true },
-    { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "titleYear", builtIn: true }
+    { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "title", builtIn: true }
 ];
 
 const SITE_OPTIONS = [
@@ -264,7 +264,8 @@ function normalizeSearchEngine(raw, fallback = {}) {
         id: raw?.id || fallback.id || makeId("engine"),
         name: (raw?.name || fallback.name || "Search Engine").trim(),
         url: ensureQueryPlaceholder(raw?.url || fallback.url || ""),
-        builtIn: Boolean(raw?.builtIn ?? fallback.builtIn)
+        builtIn: Boolean(raw?.builtIn ?? fallback.builtIn),
+        iconUrl: raw?.iconUrl || ""
     };
 }
 
@@ -731,11 +732,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     function createSearchEngineCard(engine, index) {
         const card = document.createElement("div");
         card.className = "engine-card";
+        card.dataset.collection = "searchEngines";
+        card.dataset.index = index;
         const header = document.createElement("div");
         header.className = "engine-card-header";
         const title = document.createElement("div");
         title.className = "engine-title";
-        title.appendChild(createFaviconElement(engine.url, engine.name));
+        const handle = createDragHandle();
+        handle.draggable = true;
+        title.appendChild(handle);
+        title.appendChild(createClickableIcon(engine));
         updateTitleBlock(title, engine, engine.url);
         if (engine.builtIn) {
             const badge = document.createElement("span");
@@ -807,13 +813,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         return btn;
     }
 
+    function createDragHandle() {
+        const handle = document.createElement("span");
+        handle.className = "drag-handle";
+        handle.textContent = "\u22EE\u22EE";
+        handle.title = "Drag to reorder";
+        return handle;
+    }
+
     function createMenuItemCard(item, index) {
         const card = document.createElement("div");
         card.className = "engine-card";
+        card.dataset.collection = "menuItems";
+        card.dataset.index = index;
         const header = document.createElement("div");
         header.className = "engine-card-header";
         const title = document.createElement("div");
         title.className = "engine-title";
+        const handle = createDragHandle();
+        handle.draggable = true;
+        title.appendChild(handle);
         title.appendChild(createClickableIcon(item));
         updateTitleBlock(title, item, item.usesSelectedEngine ? "Uses selected default search engine" : item.url);
         if (item.builtIn) {
@@ -875,10 +894,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     function createCustomEngineCard(item, index) {
         const card = document.createElement("div");
         card.className = "engine-card";
+        card.dataset.collection = "customEngines";
+        card.dataset.index = index;
         const header = document.createElement("div");
         header.className = "engine-card-header";
         const title = document.createElement("div");
         title.className = "engine-title";
+        const handle = createDragHandle();
+        handle.draggable = true;
+        title.appendChild(handle);
         title.appendChild(createClickableIcon(item));
         updateTitleBlock(title, item, item.url);
         header.appendChild(title);
@@ -934,6 +958,70 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
         state.searchEngines.forEach((item, index) => defaultEnginesList.appendChild(createSearchEngineCard(item, index)));
+        setupSearchEngineDragDrop();
+    }
+
+    let searchEngineDragInitialized = false;
+
+    function setupSearchEngineDragDrop() {
+        const container = defaultEnginesList;
+        if (searchEngineDragInitialized) return;
+        searchEngineDragInitialized = true;
+        let srcCard = null;
+
+        const onDragStart = (e) => {
+            const handle = e.target.closest(".drag-handle");
+            if (!handle) { e.preventDefault(); return; }
+            srcCard = handle.closest(".engine-card");
+            if (!srcCard) { e.preventDefault(); return; }
+            srcCard.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", "");
+        };
+
+        const onDragOver = (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            const tgt = e.target.closest(".engine-card");
+            if (!tgt || tgt === srcCard) return;
+            tgt.classList.add("drag-over");
+        };
+
+        const onDragLeave = (e) => {
+            const tgt = e.target.closest(".engine-card");
+            if (!tgt) return;
+            tgt.classList.remove("drag-over");
+        };
+
+        const onDrop = (e) => {
+            e.preventDefault();
+            const tgtCard = e.target.closest(".engine-card");
+            if (!tgtCard || !srcCard || tgtCard === srcCard) return;
+            tgtCard.classList.remove("drag-over");
+
+            const srcIdx = parseInt(srcCard.dataset.index, 10);
+            const tgtIdx = parseInt(tgtCard.dataset.index, 10);
+
+            const [moved] = state.searchEngines.splice(srcIdx, 1);
+            state.searchEngines.splice(tgtIdx, 0, moved);
+
+            isDirty = true;
+            render();
+        };
+
+        const onDragEnd = () => {
+            if (srcCard) {
+                srcCard.classList.remove("dragging");
+                srcCard = null;
+            }
+            container.querySelectorAll(".engine-card.drag-over").forEach(c => c.classList.remove("drag-over"));
+        };
+
+        container.addEventListener("dragstart", onDragStart);
+        container.addEventListener("dragover", onDragOver);
+        container.addEventListener("dragleave", onDragLeave);
+        container.addEventListener("drop", onDrop);
+        container.addEventListener("dragend", onDragEnd);
     }
 
     function renderMenuItems() {
@@ -947,6 +1035,80 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (state.customEngines.length > 0) {
             state.customEngines.forEach((item, index) => menuItemsList.appendChild(createCustomEngineCard(item, index)));
         }
+        setupDragDrop();
+    }
+
+    let dragDropInitialized = false;
+
+    function setupDragDrop() {
+        const container = menuItemsList;
+        if (dragDropInitialized) return;
+        dragDropInitialized = true;
+        let srcCard = null;
+
+        const onDragStart = (e) => {
+            const handle = e.target.closest(".drag-handle");
+            if (!handle) { e.preventDefault(); return; }
+            srcCard = handle.closest(".engine-card");
+            if (!srcCard) { e.preventDefault(); return; }
+            srcCard.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", "");
+        };
+
+        const onDragOver = (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            const tgt = e.target.closest(".engine-card");
+            if (!tgt || tgt === srcCard) return;
+            tgt.classList.add("drag-over");
+        };
+
+        const onDragLeave = (e) => {
+            const tgt = e.target.closest(".engine-card");
+            if (!tgt) return;
+            tgt.classList.remove("drag-over");
+        };
+
+        const onDrop = (e) => {
+            e.preventDefault();
+            const tgtCard = e.target.closest(".engine-card");
+            if (!tgtCard || !srcCard || tgtCard === srcCard) return;
+            tgtCard.classList.remove("drag-over");
+
+            const srcCol = srcCard.dataset.collection;
+            const srcIdx = parseInt(srcCard.dataset.index, 10);
+            const tgtCol = tgtCard.dataset.collection;
+            const tgtIdx = parseInt(tgtCard.dataset.index, 10);
+
+            const srcList = state[srcCol];
+            const tgtList = state[tgtCol];
+            if (!srcList || !tgtList) return;
+
+            if (srcCol === tgtCol) {
+                const [moved] = srcList.splice(srcIdx, 1);
+                srcList.splice(tgtIdx, 0, moved);
+            } else {
+                const [moved] = srcList.splice(srcIdx, 1);
+                tgtList.splice(tgtIdx, 0, moved);
+            }
+
+            isDirty = true;
+            render();
+        };
+
+        const onDragEnd = () => {
+            container.querySelectorAll(".engine-card").forEach(c => {
+                c.classList.remove("dragging", "drag-over");
+            });
+            srcCard = null;
+        };
+
+        container.addEventListener("dragstart", onDragStart);
+        container.addEventListener("dragover", onDragOver);
+        container.addEventListener("dragleave", onDragLeave);
+        container.addEventListener("drop", onDrop);
+        container.addEventListener("dragend", onDragEnd);
     }
 
     function updateSaveButtonState() {

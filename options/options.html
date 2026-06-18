@@ -252,6 +252,20 @@
             text-transform: uppercase;
         }
 
+        .drag-handle {
+            cursor: grab;
+            color: #555;
+            font-size: 18px;
+            padding: 0 4px;
+            user-select: none;
+            line-height: 1;
+            flex-shrink: 0;
+            letter-spacing: -1px;
+        }
+        .drag-handle:active { cursor: grabbing; }
+        .engine-card.dragging { opacity: 0.35; }
+        .engine-card.drag-over { border-color: var(--accent-blue); box-shadow: 0 0 0 1px var(--accent-blue); }
+
         .engine-badge {
             background: rgba(245, 197, 24, 0.15);
             color: var(--accent);
@@ -486,7 +500,7 @@
         }
         .section-collapse-body {
             overflow: hidden;
-            max-height: 2000px;
+            max-height: 99999px;
             transition: max-height 0.35s ease;
         }
         .section.collapsed .section-collapse-body {

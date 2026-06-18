@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "reré: IMDb Quick ReSearching",
-  "version": "0.1.83",
-  "description": "Adds convenient search buttons to IMDb.",
+  "name": "reré: Quick ReSearching",
+  "version": "0.1.88",
+  "description": "Adds convenient search buttons to IMDb and MyAnimeList, with profiles, per-site settings, and context menu.",
 
   "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
   "host_permissions": ["*://www.imdb.com/*", "*://myanimelist.net/*"],
