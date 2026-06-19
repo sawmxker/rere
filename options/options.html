@@ -393,6 +393,19 @@
             display: block;
         }
 
+        .status.suggestion {
+            background: #2a2410;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 10px;
+        }
+        .status.suggestion .mini-btn {
+            flex-shrink: 0;
+        }
+
         .empty-state {
             color: #888;
             padding: 12px;
@@ -1011,6 +1024,17 @@
                         <option value="reresearch">reré: search</option>
                         <option value="search">Search</option>
                     </select>
+                </div>
+
+                <div class="toggle-row">
+                    <div>
+                        <div class="toggle-label">MAL Quick Link (Jikan API)</div>
+                        <div class="toggle-desc">When enabled, uses the Jikan API to find MyAnimeList pages from other sources (IMDb, etc.) and adds a direct link in the search modal.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="malQuickLinkToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
 
                 <h3 style="margin:20px 0 12px 0;font-size:15px;color:var(--accent);">Profiles</h3>

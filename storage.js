@@ -109,7 +109,8 @@ function _extractDomains(state) {
         malEnabled: state.malEnabled,
         contextMenuEnabled: state.contextMenuEnabled,
         imdbButtonLabel: state.imdbButtonLabel,
-        malButtonLabel: state.malButtonLabel
+        malButtonLabel: state.malButtonLabel,
+        malQuickLink: state.malQuickLink
     };
     if (state.searchEngines) {
         d._e = state.searchEngines.map(e => ({
@@ -125,7 +126,8 @@ function _extractDomains(state) {
                     id: i.id, name: i.name, url: i.url,
                     queryMode: i.queryMode, builtIn: !!i.builtIn,
                     usesSelectedEngine: !!i.usesSelectedEngine,
-                    iconUrl: i.iconUrl || ""
+                    iconUrl: i.iconUrl || "",
+                    malApiMode: i.malApiMode || "none"
                 })),
                 customEngines: (p.customEngines || []).map(i => ({
                     id: i.id, name: i.name, url: i.url,

@@ -11,7 +11,7 @@
     const DEFAULT_MENU_ITEMS = [
         { id: 'menu_search', name: 'Search in new tab', url: '__DEFAULT_ENGINE__', queryMode: 'titleYear', usesSelectedEngine: true, builtIn: true },
         { id: 'menu_youtube', name: 'Search YouTube', url: 'https://www.youtube.com/results?search_query={query}', queryMode: 'title', builtIn: true },
-        { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true },
+        { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true, malApiMode: 'none' },
         { id: 'menu_archive', name: 'Search Archive.org', url: 'https://archive.org/search?tab=all&query={query}', queryMode: 'title', builtIn: true },
         { id: 'menu_rutracker', name: 'Search RuTracker', url: 'https://rutracker.org/forum/tracker.php?nm={query}', queryMode: 'title', builtIn: true }
     ];
@@ -75,13 +75,15 @@
 
     function normalizeMenuItem(raw, fallback = {}) {
         const url = raw?.usesSelectedEngine ? '__DEFAULT_ENGINE__' : raw?.url ?? fallback.url ?? '';
+        const rawMalMode = raw?.malApiMode || fallback.malApiMode || 'none';
         return {
             id: raw?.id || fallback.id || `menu_${Date.now()}`,
             name: raw?.name || fallback.name || 'Quick Search Item',
             url: url === '__DEFAULT_ENGINE__' ? '__DEFAULT_ENGINE__' : ensureQueryPlaceholder(url),
             queryMode: normalizeQueryMode(raw?.queryMode, fallback.queryMode || 'titleYear'),
             usesSelectedEngine: url === '__DEFAULT_ENGINE__' || Boolean(raw?.usesSelectedEngine ?? fallback.usesSelectedEngine),
-            iconUrl: raw?.iconUrl || ''
+            iconUrl: raw?.iconUrl || '',
+            malApiMode: ['none', 'split', 'always'].includes(rawMalMode) ? rawMalMode : 'none'
         };
     }
 
@@ -91,7 +93,8 @@
             name: raw?.name || 'Custom Search',
             url: ensureQueryPlaceholder(raw?.url || ''),
             queryMode: normalizeQueryMode(raw?.queryMode, 'titleYear'),
-            iconUrl: raw?.iconUrl || ''
+            iconUrl: raw?.iconUrl || '',
+            malApiMode: ['none', 'split', 'always'].includes(raw?.malApiMode) ? raw.malApiMode : 'none'
         };
     }
 
@@ -133,13 +136,16 @@
             }
         }
 
+        const malQuickLink = typeof data.malQuickLink === 'boolean' ? data.malQuickLink : true;
+
         return {
             suffix,
             searchEngineId,
             searchQueryMode,
             searchEngines,
             menuItems,
-            customEngines
+            customEngines,
+            malQuickLink
         };
     }
 
@@ -208,6 +214,22 @@
         } catch (error) {
             return '';
         }
+    }
+
+    let _lastJikanCall = 0;
+
+    async function jikanSearchAnime(title) {
+        const now = Date.now();
+        const wait = Math.max(0, 450 - (now - _lastJikanCall));
+        if (wait > 0) await new Promise(r => setTimeout(r, wait));
+        _lastJikanCall = Date.now();
+        try {
+            const res = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`);
+            if (!res.ok) return null;
+            const json = await res.json();
+            if (json.data && json.data.length > 0) return json.data[0].url;
+        } catch {}
+        return null;
     }
 
     let currentModal = null;
@@ -383,13 +405,15 @@
         const btnGroup = document.createElement('div');
         btnGroup.style.cssText = 'display:flex;gap:4px;flex-shrink:0;margin-left:auto;padding-left:12px;';
 
-        function createIconBtn(svgPath, title, url) {
+        function createIconBtn(svgPath, title, url, btnStyle) {
             if (!url) return null;
             const btn = document.createElement('button');
             btn.title = title;
-            btn.style.cssText = 'width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);cursor:pointer;color:#999;display:flex;align-items:center;justify-content:center;padding:0;transition:all 0.15s;';
-            btn.onmouseenter = () => { btn.style.background = 'rgba(255,255,255,0.15)'; btn.style.color = '#fff'; };
-            btn.onmouseleave = () => { btn.style.background = 'rgba(255,255,255,0.05)'; btn.style.color = '#999'; };
+            btn.style.cssText = btnStyle || 'width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);cursor:pointer;color:#999;display:flex;align-items:center;justify-content:center;padding:0;transition:all 0.15s;';
+            if (!btnStyle) {
+                btn.onmouseenter = () => { btn.style.background = 'rgba(255,255,255,0.15)'; btn.style.color = '#fff'; };
+                btn.onmouseleave = () => { btn.style.background = 'rgba(255,255,255,0.05)'; btn.style.color = '#999'; };
+            }
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('width', '13');
             svg.setAttribute('height', '13');
@@ -408,6 +432,11 @@
             return btn;
         }
 
+        if (item.malApiUrl) {
+            const apiBtn = createIconBtn('M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z', 'Open on MyAnimeList (API)', item.malApiUrl);
+            if (apiBtn) btnGroup.appendChild(apiBtn);
+        }
+
         const titleBtn = createIconBtn('M5 4h14v3h-5.5v13h-3V7H5V4z', 'Search by title only', item.urlTitle);
         if (titleBtn) btnGroup.appendChild(titleBtn);
 
@@ -419,39 +448,121 @@
         return container;
     }
 
+    async function _jikanSearchCached(title, cache) {
+        if (cache[title]) return cache[title];
+        const url = await jikanSearchAnime(title);
+        cache[title] = url;
+        return url;
+    }
+
     async function getMenuItems(title, year, overrideProfileId) {
         try {
             const settings = normalizeSettings(await storageGet(null), overrideProfileId);
             const items = [];
-            settings.menuItems.forEach((item) => {
+            const jikanCache = {};
+            const isMalUrl = (url) => (url || '').toLowerCase().includes('myanimelist.net');
+            let hasMalApiItem = false;
+
+            for (const item of settings.menuItems) {
                 const mode = item.usesSelectedEngine && item.queryMode === 'configured' ? settings.searchQueryMode : item.queryMode;
                 const suffix = item.usesSelectedEngine && item.queryMode === 'configured' ? settings.suffix : '';
                 const query = buildQuery(title, year, mode, suffix);
                 const titleQuery = buildQuery(title, year, 'title', '');
                 const titleYearQuery = buildQuery(title, year, 'titleYear', '');
-                items.push({
+                const resolvedUrl = buildUrl(item.url, query, settings, item.queryMode);
+                const resolvedUrlTitle = buildUrl(item.url, titleQuery, settings, item.queryMode);
+                const resolvedUrlYear = buildUrl(item.url, titleYearQuery, settings, item.queryMode);
+
+                const isMal = isMalUrl(item.url) && ['split', 'always'].includes(item.malApiMode);
+
+                if (isMal && item.malApiMode === 'always') {
+                    const malUrl = await _jikanSearchCached(title, jikanCache);
+                    if (malUrl) {
+                        items.push({
+                            text: item.name,
+                            url: malUrl,
+                            iconUrl: item.iconUrl || 'https://myanimelist.net/favicon.ico'
+                        });
+                        hasMalApiItem = true;
+                        continue;
+                    }
+                }
+
+                const normalItem = {
                     text: item.name,
-                    url: buildUrl(item.url, query, settings, item.queryMode),
-                    urlTitle: buildUrl(item.url, titleQuery, settings, item.queryMode),
-                    urlTitleYear: buildUrl(item.url, titleYearQuery, settings, item.queryMode),
+                    url: resolvedUrl,
+                    urlTitle: resolvedUrlTitle,
+                    urlTitleYear: resolvedUrlYear,
                     iconUrl: item.iconUrl || getFaviconUrl(item.url, settings)
-                });
-            });
+                };
+
+                if (isMal && item.malApiMode === 'split') {
+                    const malUrl = await _jikanSearchCached(title, jikanCache);
+                    if (malUrl) {
+                        normalItem.malApiUrl = malUrl;
+                        hasMalApiItem = true;
+                    }
+                }
+
+                items.push(normalItem);
+            }
+
             if (settings.customEngines.length > 0 && items.length > 0) {
                 items.push({ isDivider: true });
             }
-            settings.customEngines.forEach((item) => {
+            for (const item of settings.customEngines) {
                 const query = buildQuery(title, year, item.queryMode, '');
                 const titleQuery = buildQuery(title, year, 'title', '');
                 const titleYearQuery = buildQuery(title, year, 'titleYear', '');
-                items.push({
+                const resolvedUrl = buildUrl(item.url, query, settings, item.queryMode);
+                const resolvedUrlTitle = buildUrl(item.url, titleQuery, settings, item.queryMode);
+                const resolvedUrlYear = buildUrl(item.url, titleYearQuery, settings, item.queryMode);
+
+                const isMal = isMalUrl(item.url) && ['split', 'always'].includes(item.malApiMode);
+
+                if (isMal && item.malApiMode === 'always') {
+                    const malUrl = await _jikanSearchCached(title, jikanCache);
+                    if (malUrl) {
+                        items.push({
+                            text: item.name,
+                            url: malUrl,
+                            iconUrl: item.iconUrl || 'https://myanimelist.net/favicon.ico'
+                        });
+                        hasMalApiItem = true;
+                        continue;
+                    }
+                }
+
+                const normalItem = {
                     text: item.name,
-                    url: buildUrl(item.url, query, settings, item.queryMode),
-                    urlTitle: buildUrl(item.url, titleQuery, settings, item.queryMode),
-                    urlTitleYear: buildUrl(item.url, titleYearQuery, settings, item.queryMode),
+                    url: resolvedUrl,
+                    urlTitle: resolvedUrlTitle,
+                    urlTitleYear: resolvedUrlYear,
                     iconUrl: item.iconUrl || getFaviconUrl(item.url, settings)
-                });
-            });
+                };
+
+                if (isMal && item.malApiMode === 'split') {
+                    const malUrl = await _jikanSearchCached(title, jikanCache);
+                    if (malUrl) {
+                        normalItem.malApiUrl = malUrl;
+                        hasMalApiItem = true;
+                    }
+                }
+
+                items.push(normalItem);
+            }
+            if (settings.malQuickLink && !hasMalApiItem) {
+                const malUrl = await _jikanSearchCached(title, jikanCache);
+                if (malUrl) {
+                    items.unshift({
+                        text: 'Open on MyAnimeList',
+                        url: malUrl,
+                        urlTitle: malUrl,
+                        urlTitleYear: malUrl,
+                        iconUrl: 'https://myanimelist.net/favicon.ico'
+                    });
+                }
+            }
             return items;
         } catch (error) {
             console.error('Error loading menu settings:', error);
