@@ -16,7 +16,7 @@ const DEFAULT_MENU_ITEMS = [
 const DEFAULT_MAL_MENU_ITEMS = [
     { id: "menu_search", name: "Search in new tab", url: "__DEFAULT_ENGINE__", queryMode: "titleYear", builtIn: true, usesSelectedEngine: true },
     { id: "menu_youtube", name: "Search YouTube", url: "https://www.youtube.com/results?search_query={query}", queryMode: "title", builtIn: true },
-    { id: 'menu_imdb', name: 'Search IMDb', url: 'https://www.imdb.com/find/?q={query}', queryMode: 'titleYear', builtIn: true, imdbApiMode: 'none' },
+    { id: 'menu_imdb', name: 'Search IMDb', url: 'https://www.imdb.com/search/title/?title={title}&release_date={year}-01-01,{year}-12-31&adult=include', queryMode: 'title', builtIn: true, imdbApiMode: 'none' },
     { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?tab=all&query={query}", queryMode: "title", builtIn: true },
     { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "title", builtIn: true }
 ];
@@ -105,7 +105,8 @@ function createDefaultState() {
         imdbButtonLabel: "reresearch",
         malButtonLabel: "reresearch",
         malQuickLink: true,
-        imdbQuickLink: true
+        imdbQuickLink: true,
+        searchTitleMode: "original"
     };
 }
 
@@ -118,6 +119,8 @@ function ensureQueryPlaceholder(url) {
     if (!trimmed || trimmed === "__DEFAULT_ENGINE__") {
         return trimmed;
     }
+    const hasCustom = trimmed.includes("{title}") || trimmed.includes("{year}");
+    if (hasCustom) return trimmed;
     return trimmed.includes("{query}") ? trimmed : `${trimmed}{query}`;
 }
 
@@ -143,7 +146,19 @@ function buildSearchUrl(url, mode, suffix = "") {
     }
 
     const queryText = [getQueryText(mode), suffix.trim()].filter(Boolean).join(" ");
-    return ensureQueryPlaceholder(url).replace("{query}", encodeURIComponent(queryText.trim()));
+    const sampleTitle = "Movie Title";
+    const sampleYear = "2024";
+    return ensureQueryPlaceholder(url)
+        .replace("{query}", encodeURIComponent(queryText.trim()))
+        .replace(/\{title\}/g, encodeURIComponent(sampleTitle))
+        .replace(/\{year\}/g, encodeURIComponent(sampleYear));
+}
+
+function replaceUrlPlaceholders(url, queryVal, titleVal, yearVal) {
+    return url
+        .replace(/\{query\}/g, queryVal)
+        .replace(/\{title\}/g, titleVal)
+        .replace(/\{year\}/g, yearVal);
 }
 
 function getOriginFromUrl(url) {
@@ -152,18 +167,18 @@ function getOriginFromUrl(url) {
         : ensureQueryPlaceholder(url);
 
     try {
-        const parsed = new URL(normalized.replace("{query}", "test"));
+        const parsed = new URL(replaceUrlPlaceholders(normalized, "test", "test", "2000"));
         return parsed.origin;
     } catch (error) {
         return "";
     }
 }
-
 function extractTargetDomainFromQuery(url) {
     try {
-        const testUrl = url.replace("{query}", "test");
+        const testUrl = replaceUrlPlaceholders(url, "test", "test", "2000");
         const parsed = new URL(testUrl);
         const queryParams = new URLSearchParams(parsed.search);
+
         for (const param of ['q', 'query', 'p', 's']) {
             const value = queryParams.get(param);
             if (!value) continue;
@@ -196,7 +211,7 @@ function getFaviconUrl(url) {
         ? getSearchEngineById(state.searchEngineId)?.url || ""
         : ensureQueryPlaceholder(url);
     try {
-        const parsed = new URL(normalized.replace("{query}", "test"));
+        const parsed = new URL(replaceUrlPlaceholders(normalized, "test", "test", "2000"));
         return `${parsed.origin}/favicon.ico`;
     } catch (error) {
         return "";
@@ -206,7 +221,7 @@ function getFaviconUrl(url) {
 function extractDomainsFromUrl(url) {
     const domains = [];
     try {
-        const testUrl = url.replace("{query}", "test");
+        const testUrl = replaceUrlPlaceholders(url, "test", "test", "2000");
         const parsed = new URL(testUrl);
         const mainDomain = parsed.hostname.replace(/^www\./, "");
         if (mainDomain) domains.push(mainDomain);
@@ -233,7 +248,7 @@ function isValidHttpUrl(url) {
         return false;
     }
     try {
-        const parsed = new URL(normalized.replace("{query}", "test"));
+        const parsed = new URL(replaceUrlPlaceholders(normalized, "test", "test", "2000"));
         return parsed.protocol === "http:" || parsed.protocol === "https:";
     } catch (error) {
         return false;
@@ -402,6 +417,7 @@ function normalizeSettings(raw) {
     if (raw.malButtonLabel === "search" || raw.malButtonLabel === "reresearch") next.malButtonLabel = raw.malButtonLabel;
     if (typeof raw.malQuickLink === "boolean") next.malQuickLink = raw.malQuickLink;
     if (typeof raw.imdbQuickLink === "boolean") next.imdbQuickLink = raw.imdbQuickLink;
+    if (raw.searchTitleMode === "original" || raw.searchTitleMode === "english") next.searchTitleMode = raw.searchTitleMode;
 
     const active = next.profiles[next.activeProfileId];
     if (active) {
@@ -499,7 +515,8 @@ function serializeSettings() {
         imdbButtonLabel: state.imdbButtonLabel,
         malButtonLabel: state.malButtonLabel,
         malQuickLink: state.malQuickLink,
-        imdbQuickLink: state.imdbQuickLink
+        imdbQuickLink: state.imdbQuickLink,
+        searchTitleMode: state.searchTitleMode
     };
 }
 
@@ -564,6 +581,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const suffixInput = document.getElementById("suffix");
     const engineSelect = document.getElementById("searchEngine");
     const searchQueryModeSelect = document.getElementById("searchQueryMode");
+    const searchTitleModeSelect = document.getElementById("searchTitleModeMAL");
     const searchPreview = document.getElementById("searchPreview");
     const saveBtn = document.getElementById("saveBtn");
     const resetBtn = document.getElementById("resetBtn");
@@ -1269,6 +1287,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateEngineSelect();
         searchQueryModeSelect.value = state.searchQueryMode;
         suffixInput.value = state.suffix;
+        searchTitleModeSelect.value = state.searchTitleMode || 'original';
         renderDefaultEngines();
         renderMenuItems();
         updateSearchPreview();
@@ -1375,6 +1394,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         isDirty = true;
         updateSaveButtonState();
         updateSearchPreview();
+    });
+
+    searchTitleModeSelect.addEventListener("change", () => {
+        state.searchTitleMode = searchTitleModeSelect.value;
+        isDirty = true;
+        updateSaveButtonState();
     });
 
     profileSelect.addEventListener("change", () => {
@@ -1698,6 +1723,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         state.suffix = suffixInput.value.trim();
         state.searchEngineId = engineSelect.value;
         state.searchQueryMode = searchQueryModeSelect.value;
+        state.searchTitleMode = searchTitleModeSelect.value;
 
         const profile = getActiveProfile();
         if (profile) {

@@ -29,6 +29,12 @@
             title = titleEl.innerText.replace(/\s*\(TV.*?\)\s*$/, '').replace(/\s*\(Movie\)\s*$/, '').replace(/\s*\(\w+ \d{4}\)\s*$/, '').trim();
         }
 
+        let englishTitle = '';
+        const englishEl = document.querySelector('p.title-english.title-inherit');
+        if (englishEl) {
+            englishTitle = englishEl.innerText.trim();
+        }
+
         let year = '';
         const h1 = document.querySelector('h1');
         if (h1) {
@@ -56,7 +62,7 @@
             }
         }
 
-        return { title, year };
+        return { title, year, englishTitle };
     }
 
     function getPosterUrl() {
@@ -72,6 +78,8 @@
         if (!trimmed || trimmed === '__DEFAULT_ENGINE__') {
             return trimmed;
         }
+        const hasCustom = trimmed.includes('{title}') || trimmed.includes('{year}');
+        if (hasCustom) return trimmed;
         return trimmed.includes('{query}') ? trimmed : `${trimmed}{query}`;
     }
 
@@ -142,9 +150,10 @@
             ? data.customEngines.map(normalizeCustomEngine)
             : [];
 
+        let profile;
         if (data.profiles) {
             const profileId = overrideProfileId || getProfileIdForHost();
-            const profile = data.profiles[profileId];
+            profile = data.profiles[profileId];
             if (profile) {
                 suffix = typeof profile.suffix === 'string' ? profile.suffix : suffix;
                 searchQueryMode = normalizeQueryMode(profile.searchQueryMode, searchQueryMode);
@@ -157,6 +166,7 @@
             }
         }
 
+        const searchTitleMode = data.searchTitleMode === 'english' ? 'english' : 'original';
         const imdbQuickLink = typeof data.imdbQuickLink === 'boolean' ? data.imdbQuickLink : true;
 
         return {
@@ -166,6 +176,7 @@
             searchEngines,
             menuItems,
             customEngines,
+            searchTitleMode,
             imdbQuickLink
         };
     }
@@ -180,7 +191,7 @@
         return [title || '', yearPart, suffix].filter(Boolean).join(' ').trim();
     }
 
-    function buildUrl(url, query, settings, mode) {
+    function buildUrl(url, query, title, year, settings, mode) {
         let targetUrl = url;
         let effectiveMode = mode;
         if (url === '__DEFAULT_ENGINE__') {
@@ -188,12 +199,15 @@
             targetUrl = selectedEngine?.url || DEFAULT_SEARCH_ENGINES[0].url;
             effectiveMode = mode === 'configured' ? settings.searchQueryMode : mode;
         }
-        return ensureQueryPlaceholder(targetUrl).replace('{query}', encodeURIComponent(query));
+        return ensureQueryPlaceholder(targetUrl)
+            .replace('{query}', encodeURIComponent(query))
+            .replace(/\{title\}/g, encodeURIComponent(title || ''))
+            .replace(/\{year\}/g, encodeURIComponent(year || ''));
     }
 
     function extractTargetDomainFromQuery(url) {
         try {
-            const testUrl = url.replace("{query}", "test");
+            const testUrl = url.replace(/\{query\}/g, "test").replace(/\{title\}/g, "test").replace(/\{year\}/g, "2000");
             const parsed = new URL(testUrl);
             const queryParams = new URLSearchParams(parsed.search);
 
@@ -230,7 +244,7 @@
             return `${protocol}//${targetDomain}/favicon.ico`;
         }
         try {
-            const parsed = new URL(targetUrl.replace('{query}', 'test'));
+            const parsed = new URL(targetUrl.replace(/\{query\}/g, 'test').replace(/\{title\}/g, 'test').replace(/\{year\}/g, '2000'));
             return `${parsed.origin}/favicon.ico`;
         } catch (error) {
             return '';
@@ -313,7 +327,7 @@
         mainBtn.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const { title, year } = getTitleAndYear();
+            const { title, year, englishTitle } = getTitleAndYear();
             try {
                 const data = await storageGet(null);
                 const profiles = data.profiles || {};
@@ -322,19 +336,20 @@
                 const matchingEntry = currentSite ? Object.entries(profiles).find(([, p]) => p.site === currentSite) : null;
                 if (!hasAnySite || !matchingEntry) {
                     if (currentModal) { closeMenu(); return; }
-                    currentModal = createModal(title, year, getPosterUrl());
+                    currentModal = createModal(title, year, getPosterUrl(), englishTitle);
                     document.body.appendChild(currentModal);
                     document.body.style.overflow = 'hidden';
                     return;
                 }
                 const settings = normalizeSettings(data, matchingEntry[0]);
                 const selectedEngine = getSelectedEngine(settings);
-                const query = buildQuery(title, year, settings.searchQueryMode, settings.suffix);
-                window.open(buildUrl(selectedEngine.url, query, settings, settings.searchQueryMode), '_blank');
+                const effectiveTitle = settings.searchTitleMode === 'english' && englishTitle ? englishTitle : title;
+                const query = buildQuery(effectiveTitle, year, settings.searchQueryMode, settings.suffix);
+                window.open(buildUrl(selectedEngine.url, query, effectiveTitle, year, settings, settings.searchQueryMode), '_blank');
             } catch (error) {
                 console.error('MAL Search: Error loading settings:', error);
                 if (currentModal) { closeMenu(); return; }
-                currentModal = createModal(title, year, getPosterUrl());
+                currentModal = createModal(title, year, getPosterUrl(), englishTitle);
                 document.body.appendChild(currentModal);
                 document.body.style.overflow = 'hidden';
             }
@@ -347,8 +362,8 @@
                 closeMenu();
                 return;
             }
-            const { title, year } = getTitleAndYear();
-            currentModal = createModal(title, year, getPosterUrl());
+            const { title, year, englishTitle } = getTitleAndYear();
+            currentModal = createModal(title, year, getPosterUrl(), englishTitle);
             document.body.appendChild(currentModal);
             document.body.style.overflow = 'hidden';
         };
@@ -461,7 +476,18 @@
         return container;
     }
 
-    async function imdbSearchTitle(title) {
+    function buildImdbSearchUrl(title, year) {
+        if (year) {
+            const y = parseInt(year, 10);
+            if (!isNaN(y)) {
+                return `https://www.imdb.com/search/title/?title=${encodeURIComponent(title)}&release_date=${y}-01-01,${y}-12-31&adult=include`;
+            }
+        }
+        return `https://www.imdb.com/search/title/?title=${encodeURIComponent(title)}&adult=include`;
+    }
+
+    async function imdbSearchTitle(title, year) {
+        const searchUrl = buildImdbSearchUrl(title, year);
         try {
             const firstLetter = encodeURIComponent(title.charAt(0).toLowerCase());
             const json = await browser.runtime.sendMessage({
@@ -469,22 +495,28 @@
                 url: `https://v3.sg.media-imdb.com/suggestion/${firstLetter}/${encodeURIComponent(title)}.json`
             });
             if (json && json.d && json.d.length > 0 && json.d[0].id) {
-                return `https://www.imdb.com/title/${json.d[0].id}/`;
+                const apiYear = json.d[0].y;
+                if (!year || (apiYear && Math.abs(apiYear - year) <= 1)) {
+                    return `https://www.imdb.com/title/${json.d[0].id}/`;
+                }
             }
         } catch {}
-        return null;
+        return searchUrl;
     }
 
-    async function _imdbSearchCached(title, cache) {
+    async function _imdbSearchCached(title, year, cache) {
         if (cache[title]) return cache[title];
-        const url = await imdbSearchTitle(title);
+        const url = await imdbSearchTitle(title, year);
         cache[title] = url;
         return url;
     }
 
-    async function getMenuItems(title, year, overrideProfileId) {
+    async function getMenuItems(title, year, overrideProfileId, englishTitle) {
         try {
             const settings = normalizeSettings(await storageGet(null), overrideProfileId);
+            if (settings.searchTitleMode === 'english' && englishTitle) {
+                title = englishTitle;
+            }
             const items = [];
             const apiTasks = [];
             const imdbCache = {};
@@ -497,9 +529,9 @@
                 const query = buildQuery(title, year, mode, suffix);
                 const titleQuery = buildQuery(title, year, 'title', '');
                 const titleYearQuery = buildQuery(title, year, 'titleYear', '');
-                const resolvedUrl = buildUrl(rawItem.url, query, settings, rawItem.queryMode);
-                const resolvedUrlTitle = buildUrl(rawItem.url, titleQuery, settings, rawItem.queryMode);
-                const resolvedUrlYear = buildUrl(rawItem.url, titleYearQuery, settings, rawItem.queryMode);
+                const resolvedUrl = buildUrl(rawItem.url, query, title, year, settings, rawItem.queryMode);
+                const resolvedUrlTitle = buildUrl(rawItem.url, titleQuery, title, year, settings, rawItem.queryMode);
+                const resolvedUrlYear = buildUrl(rawItem.url, titleYearQuery, title, year, settings, rawItem.queryMode);
 
                 const normalItem = {
                     text: rawItem.name,
@@ -514,7 +546,7 @@
 
                 if (isImdb) {
                     const imdbMode = rawItem.imdbApiMode;
-                    apiTasks.push(_imdbSearchCached(title, imdbCache).then(url => {
+                    apiTasks.push(_imdbSearchCached(title, year, imdbCache).then(url => {
                         if (url) {
                             hasImdbApiItem = true;
                             if (imdbMode === 'always') normalItem.url = url;
@@ -529,7 +561,7 @@
             for (const rawItem of settings.customEngines) processItem(rawItem);
 
             if (settings.imdbQuickLink) {
-                apiTasks.push(_imdbSearchCached(title, imdbCache).then(url => {
+                apiTasks.push(_imdbSearchCached(title, year, imdbCache).then(url => {
                     if (url && !hasImdbApiItem) {
                         items.unshift({
                             text: 'Open on IMDb',
@@ -557,9 +589,9 @@
                 const titleYearQuery = buildQuery(title, year, 'titleYear', '');
                 return {
                     text: item.name,
-                    url: buildUrl(item.url, query, fallbackSettings, item.queryMode),
-                    urlTitle: buildUrl(item.url, titleQuery, fallbackSettings, item.queryMode),
-                    urlTitleYear: buildUrl(item.url, titleYearQuery, fallbackSettings, item.queryMode),
+                    url: buildUrl(item.url, query, title, year, fallbackSettings, item.queryMode),
+                    urlTitle: buildUrl(item.url, titleQuery, title, year, fallbackSettings, item.queryMode),
+                    urlTitleYear: buildUrl(item.url, titleYearQuery, title, year, fallbackSettings, item.queryMode),
                     iconUrl: getFaviconUrl(item.url, fallbackSettings)
                 };
             });
@@ -567,7 +599,7 @@
         }
     }
 
-    function createModal(title, year, posterUrl) {
+    function createModal(title, year, posterUrl, englishTitle) {
         const dark = isDarkMode();
         const bgColor = dark ? '#121212' : '#fff';
         const textColor = dark ? '#cacaca' : '#323232';
@@ -657,6 +689,37 @@
         titleDiv.textContent = year ? `${title} (${year})` : title;
         header.appendChild(titleDiv);
 
+        let usingEnglish = false;
+        const titleToggleRow = document.createElement('div');
+        titleToggleRow.style.cssText = `display:flex;gap:6px;margin-top:6px;`;
+        const origBtn = document.createElement('button');
+        origBtn.textContent = 'Original';
+        origBtn.style.cssText = `font-size:11px;padding:1px 8px;border-radius:3px;border:1px solid ${borderColor};cursor:pointer;background:${mutedColor};color:${bgColor};font-weight:600;`;
+        const engBtn = document.createElement('button');
+        engBtn.textContent = 'English';
+        engBtn.style.cssText = `font-size:11px;padding:1px 8px;border-radius:3px;border:1px solid ${borderColor};cursor:pointer;background:transparent;color:${mutedColor};`;
+        function updateTitleDisplay(t) {
+            titleDiv.textContent = year ? `${t} (${year})` : t;
+        }
+        function switchTitle(useEng) {
+            usingEnglish = useEng;
+            const active = useEng && englishTitle;
+            origBtn.style.background = active ? 'transparent' : mutedColor;
+            origBtn.style.color = active ? mutedColor : bgColor;
+            engBtn.style.background = active ? mutedColor : 'transparent';
+            engBtn.style.color = active ? bgColor : mutedColor;
+            const t = active ? englishTitle : title;
+            updateTitleDisplay(t);
+            renderMenuItems(profileSelect.value, t);
+        }
+        origBtn.onclick = () => { if (usingEnglish) switchTitle(false); };
+        engBtn.onclick = () => { if (!usingEnglish && englishTitle) switchTitle(true); };
+        if (englishTitle) {
+            titleToggleRow.appendChild(origBtn);
+            titleToggleRow.appendChild(engBtn);
+            header.appendChild(titleToggleRow);
+        }
+
         const listContainer = document.createElement('div');
         listContainer.style.padding = '8px 0';
 
@@ -678,9 +741,10 @@
             });
         }
 
-        function renderMenuItems(profileId) {
+        function renderMenuItems(profileId, activeTitle) {
+            const t = activeTitle || title;
             listContainer.innerHTML = '';
-            getMenuItems(title, year, profileId).then(({ items, resolve }) => {
+            getMenuItems(t, year, profileId, undefined).then(({ items, resolve }) => {
                 renderItemList(items);
                 resolve().then(updated => { renderItemList(updated); });
             });
@@ -705,11 +769,17 @@
                 option.selected = true;
                 profileSelect.appendChild(option);
             }
-            renderMenuItems(profileSelect.value);
+            const initialTitle = (data.searchTitleMode === 'english' && englishTitle) ? englishTitle : title;
+            if (initialTitle !== title && englishTitle) {
+                usingEnglish = true;
+                switchTitle(true);
+            } else {
+                renderMenuItems(profileSelect.value, initialTitle);
+            }
         });
 
         profileSelect.addEventListener('change', () => {
-            renderMenuItems(profileSelect.value);
+            renderMenuItems(profileSelect.value, usingEnglish && englishTitle ? englishTitle : title);
         });
 
         rightPanel.appendChild(header);

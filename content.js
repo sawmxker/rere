@@ -57,6 +57,8 @@
         if (!trimmed || trimmed === '__DEFAULT_ENGINE__') {
             return trimmed;
         }
+        const hasCustom = trimmed.includes('{title}') || trimmed.includes('{year}');
+        if (hasCustom) return trimmed;
         return trimmed.includes('{query}') ? trimmed : `${trimmed}{query}`;
     }
 
@@ -162,7 +164,7 @@
         return [title || '', yearPart, suffix].filter(Boolean).join(' ').trim();
     }
 
-    function buildUrl(url, query, settings, mode) {
+    function buildUrl(url, query, title, year, settings, mode) {
         let targetUrl = url;
         let effectiveMode = mode;
         if (url === '__DEFAULT_ENGINE__') {
@@ -170,12 +172,15 @@
             targetUrl = selectedEngine?.url || DEFAULT_SEARCH_ENGINES[0].url;
             effectiveMode = mode === 'configured' ? settings.searchQueryMode : mode;
         }
-        return ensureQueryPlaceholder(targetUrl).replace('{query}', encodeURIComponent(query));
+        return ensureQueryPlaceholder(targetUrl)
+            .replace('{query}', encodeURIComponent(query))
+            .replace(/\{title\}/g, encodeURIComponent(title || ''))
+            .replace(/\{year\}/g, encodeURIComponent(year || ''));
     }
 
     function extractTargetDomainFromQuery(url) {
     try {
-        const testUrl = url.replace("{query}", "test");
+        const testUrl = url.replace(/\{query\}/g, "test").replace(/\{title\}/g, "test").replace(/\{year\}/g, "2000");
         const parsed = new URL(testUrl);
         const queryParams = new URLSearchParams(parsed.search);
         
@@ -212,7 +217,7 @@
             return `${protocol}//${targetDomain}/favicon.ico`;
         }
         try {
-            const parsed = new URL(targetUrl.replace('{query}', 'test'));
+            const parsed = new URL(targetUrl.replace(/\{query\}/g, 'test').replace(/\{title\}/g, 'test').replace(/\{year\}/g, '2000'));
             return `${parsed.origin}/favicon.ico`;
         } catch (error) {
             return '';
@@ -293,7 +298,7 @@
                 const settings = normalizeSettings(data, matchingEntry[0]);
                 const selectedEngine = getSelectedEngine(settings);
                 const query = buildQuery(title, year, settings.searchQueryMode, settings.suffix);
-                window.open(buildUrl(selectedEngine.url, query, settings, settings.searchQueryMode), '_blank');
+                window.open(buildUrl(selectedEngine.url, query, title, year, settings, settings.searchQueryMode), '_blank');
             } catch (error) {
                 console.error('Error loading search settings:', error);
                 if (currentModal) { closeMenu(); return; }
@@ -467,9 +472,9 @@
                 const query = buildQuery(title, year, mode, suffix);
                 const titleQuery = buildQuery(title, year, 'title', '');
                 const titleYearQuery = buildQuery(title, year, 'titleYear', '');
-                const resolvedUrl = buildUrl(rawItem.url, query, settings, rawItem.queryMode);
-                const resolvedUrlTitle = buildUrl(rawItem.url, titleQuery, settings, rawItem.queryMode);
-                const resolvedUrlYear = buildUrl(rawItem.url, titleYearQuery, settings, rawItem.queryMode);
+                const resolvedUrl = buildUrl(rawItem.url, query, title, year, settings, rawItem.queryMode);
+                const resolvedUrlTitle = buildUrl(rawItem.url, titleQuery, title, year, settings, rawItem.queryMode);
+                const resolvedUrlYear = buildUrl(rawItem.url, titleYearQuery, title, year, settings, rawItem.queryMode);
 
                 const normalItem = {
                     text: rawItem.name,
@@ -527,9 +532,9 @@
                 const titleYearQuery = buildQuery(title, year, 'titleYear', '');
                 return {
                     text: item.name,
-                    url: buildUrl(item.url, query, fallbackSettings, item.queryMode),
-                    urlTitle: buildUrl(item.url, titleQuery, fallbackSettings, item.queryMode),
-                    urlTitleYear: buildUrl(item.url, titleYearQuery, fallbackSettings, item.queryMode),
+                    url: buildUrl(item.url, query, title, year, fallbackSettings, item.queryMode),
+                    urlTitle: buildUrl(item.url, titleQuery, title, year, fallbackSettings, item.queryMode),
+                    urlTitleYear: buildUrl(item.url, titleYearQuery, title, year, fallbackSettings, item.queryMode),
                     iconUrl: getFaviconUrl(item.url, fallbackSettings)
                 };
             });
