@@ -10,7 +10,7 @@
     const DEFAULT_MENU_ITEMS = [
         { id: 'menu_search', name: 'Search in new tab', url: '__DEFAULT_ENGINE__', queryMode: 'titleYear', usesSelectedEngine: true, builtIn: true },
         { id: 'menu_youtube', name: 'Search YouTube', url: 'https://www.youtube.com/results?search_query={query}', queryMode: 'title', builtIn: true },
-        { id: 'menu_imdb', name: 'Search IMDb', url: 'https://www.imdb.com/find/?q={query}', queryMode: 'titleYear', builtIn: true },
+        { id: 'menu_imdb', name: 'Search IMDb', url: 'https://www.imdb.com/find/?q={query}', queryMode: 'titleYear', builtIn: true, imdbApiMode: 'none' },
         { id: 'menu_archive', name: 'Search Archive.org', url: 'https://archive.org/search?tab=all&query={query}', queryMode: 'title', builtIn: true },
         { id: 'menu_rutracker', name: 'Search RuTracker', url: 'https://rutracker.org/forum/tracker.php?nm={query}', queryMode: 'title', builtIn: true }
     ];
@@ -91,6 +91,7 @@
     function normalizeMenuItem(raw, fallback = {}) {
         const url = raw?.usesSelectedEngine ? '__DEFAULT_ENGINE__' : raw?.url ?? fallback.url ?? '';
         const rawMalMode = raw?.malApiMode || fallback.malApiMode || 'none';
+        const rawImdbMode = raw?.imdbApiMode || fallback.imdbApiMode || 'none';
         return {
             id: raw?.id || fallback.id || `menu_${Date.now()}`,
             name: raw?.name || fallback.name || 'Quick Search Item',
@@ -98,7 +99,8 @@
             queryMode: normalizeQueryMode(raw?.queryMode, fallback.queryMode || 'titleYear'),
             usesSelectedEngine: url === '__DEFAULT_ENGINE__' || Boolean(raw?.usesSelectedEngine ?? fallback.usesSelectedEngine),
             iconUrl: raw?.iconUrl || '',
-            malApiMode: ['none', 'split', 'always'].includes(rawMalMode) ? rawMalMode : 'none'
+            malApiMode: ['none', 'split', 'always'].includes(rawMalMode) ? rawMalMode : 'none',
+            imdbApiMode: ['none', 'split', 'always'].includes(rawImdbMode) ? rawImdbMode : 'none'
         };
     }
 
@@ -109,7 +111,8 @@
             url: ensureQueryPlaceholder(raw?.url || ''),
             queryMode: normalizeQueryMode(raw?.queryMode, 'titleYear'),
             iconUrl: raw?.iconUrl || '',
-            malApiMode: ['none', 'split', 'always'].includes(raw?.malApiMode) ? raw.malApiMode : 'none'
+            malApiMode: ['none', 'split', 'always'].includes(raw?.malApiMode) ? raw.malApiMode : 'none',
+            imdbApiMode: ['none', 'split', 'always'].includes(raw?.imdbApiMode) ? raw.imdbApiMode : 'none'
         };
     }
 
@@ -154,7 +157,7 @@
             }
         }
 
-        const malQuickLink = typeof data.malQuickLink === 'boolean' ? data.malQuickLink : true;
+        const imdbQuickLink = typeof data.imdbQuickLink === 'boolean' ? data.imdbQuickLink : true;
 
         return {
             suffix,
@@ -163,7 +166,7 @@
             searchEngines,
             menuItems,
             customEngines,
-            malQuickLink
+            imdbQuickLink
         };
     }
 
@@ -442,8 +445,8 @@
             return btn;
         }
 
-        if (item.malApiUrl) {
-            const apiBtn = createIconBtn('M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z', 'Open on MyAnimeList (API)', item.malApiUrl);
+        if (item.imdbApiUrl) {
+            const apiBtn = createIconBtn('M18 4v1h-2V4H8v1H6V4H4v16h2v-1h2v1h8v-1h2v1h2V4h-2zM8 15H6v-2h2v2zm0-4H6V9h2v2zm10 4h-2v-2h2v2zm0-4h-2V9h2v2z', 'Open on IMDb (API)', item.imdbApiUrl);
             if (apiBtn) btnGroup.appendChild(apiBtn);
         }
 
@@ -458,25 +461,23 @@
         return container;
     }
 
-    let _lastJikanCall = 0;
-
-    async function jikanSearchAnime(title) {
-        const now = Date.now();
-        const wait = Math.max(0, 450 - (now - _lastJikanCall));
-        if (wait > 0) await new Promise(r => setTimeout(r, wait));
-        _lastJikanCall = Date.now();
+    async function imdbSearchTitle(title) {
         try {
-            const res = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`);
-            if (!res.ok) return null;
-            const json = await res.json();
-            if (json.data && json.data.length > 0) return json.data[0].url;
+            const firstLetter = encodeURIComponent(title.charAt(0).toLowerCase());
+            const json = await browser.runtime.sendMessage({
+                type: "apiFetch",
+                url: `https://v3.sg.media-imdb.com/suggestion/${firstLetter}/${encodeURIComponent(title)}.json`
+            });
+            if (json && json.d && json.d.length > 0 && json.d[0].id) {
+                return `https://www.imdb.com/title/${json.d[0].id}/`;
+            }
         } catch {}
         return null;
     }
 
-    async function _jikanSearchCached(title, cache) {
+    async function _imdbSearchCached(title, cache) {
         if (cache[title]) return cache[title];
-        const url = await jikanSearchAnime(title);
+        const url = await imdbSearchTitle(title);
         cache[title] = url;
         return url;
     }
@@ -485,116 +486,84 @@
         try {
             const settings = normalizeSettings(await storageGet(null), overrideProfileId);
             const items = [];
-            const jikanCache = {};
-            const isMalUrl = (url) => (url || '').toLowerCase().includes('myanimelist.net');
-            let hasMalApiItem = false;
+            const apiTasks = [];
+            const imdbCache = {};
+            const isImdbUrl = (url) => (url || '').toLowerCase().includes('imdb.com');
+            let hasImdbApiItem = false;
 
-            for (const item of settings.menuItems) {
-                const mode = item.usesSelectedEngine && item.queryMode === 'configured' ? settings.searchQueryMode : item.queryMode;
-                const suffix = item.usesSelectedEngine && item.queryMode === 'configured' ? settings.suffix : '';
+            function processItem(rawItem) {
+                const mode = rawItem.usesSelectedEngine && rawItem.queryMode === 'configured' ? settings.searchQueryMode : rawItem.queryMode;
+                const suffix = rawItem.usesSelectedEngine && rawItem.queryMode === 'configured' ? settings.suffix : '';
                 const query = buildQuery(title, year, mode, suffix);
                 const titleQuery = buildQuery(title, year, 'title', '');
                 const titleYearQuery = buildQuery(title, year, 'titleYear', '');
-                const resolvedUrl = buildUrl(item.url, query, settings, item.queryMode);
-                const resolvedUrlTitle = buildUrl(item.url, titleQuery, settings, item.queryMode);
-                const resolvedUrlYear = buildUrl(item.url, titleYearQuery, settings, item.queryMode);
-
-                const isMal = isMalUrl(item.url) && ['split', 'always'].includes(item.malApiMode);
-
-                if (isMal && item.malApiMode === 'always') {
-                    const malUrl = await _jikanSearchCached(title, jikanCache);
-                    if (malUrl) {
-                        items.push({
-                            text: item.name,
-                            url: malUrl,
-                            iconUrl: item.iconUrl || 'https://myanimelist.net/favicon.ico'
-                        });
-                        hasMalApiItem = true;
-                        continue;
-                    }
-                }
+                const resolvedUrl = buildUrl(rawItem.url, query, settings, rawItem.queryMode);
+                const resolvedUrlTitle = buildUrl(rawItem.url, titleQuery, settings, rawItem.queryMode);
+                const resolvedUrlYear = buildUrl(rawItem.url, titleYearQuery, settings, rawItem.queryMode);
 
                 const normalItem = {
-                    text: item.name,
+                    text: rawItem.name,
                     url: resolvedUrl,
                     urlTitle: resolvedUrlTitle,
                     urlTitleYear: resolvedUrlYear,
-                    iconUrl: item.iconUrl || getFaviconUrl(item.url, settings)
+                    iconUrl: rawItem.iconUrl || getFaviconUrl(rawItem.url, settings)
                 };
-
-                if (isMal && item.malApiMode === 'split') {
-                    const malUrl = await _jikanSearchCached(title, jikanCache);
-                    if (malUrl) {
-                        normalItem.malApiUrl = malUrl;
-                        hasMalApiItem = true;
-                    }
-                }
-
                 items.push(normalItem);
+
+                const isImdb = isImdbUrl(rawItem.url) && ['split', 'always'].includes(rawItem.imdbApiMode);
+
+                if (isImdb) {
+                    const imdbMode = rawItem.imdbApiMode;
+                    apiTasks.push(_imdbSearchCached(title, imdbCache).then(url => {
+                        if (url) {
+                            hasImdbApiItem = true;
+                            if (imdbMode === 'always') normalItem.url = url;
+                            else normalItem.imdbApiUrl = url;
+                        }
+                    }));
+                }
             }
 
-            if (settings.customEngines.length > 0 && items.length > 0) {
-                items.push({ isDivider: true });
-            }
-            for (const item of settings.customEngines) {
-                const query = buildQuery(title, year, item.queryMode, '');
-                const titleQuery = buildQuery(title, year, 'title', '');
-                const titleYearQuery = buildQuery(title, year, 'titleYear', '');
-                const resolvedUrl = buildUrl(item.url, query, settings, item.queryMode);
-                const resolvedUrlTitle = buildUrl(item.url, titleQuery, settings, item.queryMode);
-                const resolvedUrlYear = buildUrl(item.url, titleYearQuery, settings, item.queryMode);
+            for (const rawItem of settings.menuItems) processItem(rawItem);
+            if (settings.customEngines.length > 0 && items.length > 0) items.push({ isDivider: true });
+            for (const rawItem of settings.customEngines) processItem(rawItem);
 
-                const isMal = isMalUrl(item.url) && ['split', 'always'].includes(item.malApiMode);
-
-                if (isMal && item.malApiMode === 'always') {
-                    const malUrl = await _jikanSearchCached(title, jikanCache);
-                    if (malUrl) {
-                        items.push({
-                            text: item.name,
-                            url: malUrl,
-                            iconUrl: item.iconUrl || 'https://myanimelist.net/favicon.ico'
+            if (settings.imdbQuickLink) {
+                apiTasks.push(_imdbSearchCached(title, imdbCache).then(url => {
+                    if (url && !hasImdbApiItem) {
+                        items.unshift({
+                            text: 'Open on IMDb',
+                            url: url,
+                            urlTitle: url,
+                            urlTitleYear: url,
+                            iconUrl: 'https://www.imdb.com/favicon.ico'
                         });
-                        hasMalApiItem = true;
-                        continue;
                     }
-                }
-
-                const normalItem = {
-                    text: item.name,
-                    url: resolvedUrl,
-                    urlTitle: resolvedUrlTitle,
-                    urlTitleYear: resolvedUrlYear,
-                    iconUrl: item.iconUrl || getFaviconUrl(item.url, settings)
-                };
-
-                if (isMal && item.malApiMode === 'split') {
-                    const malUrl = await _jikanSearchCached(title, jikanCache);
-                    if (malUrl) {
-                        normalItem.malApiUrl = malUrl;
-                        hasMalApiItem = true;
-                    }
-                }
-
-                items.push(normalItem);
+                }));
             }
-            return items;
+
+            return {
+                items,
+                resolve: () => Promise.allSettled(apiTasks).then(() => items)
+            };
         } catch (error) {
             console.error('MAL Search: Error loading menu settings:', error);
-            const settings = normalizeSettings({});
-            return DEFAULT_MENU_ITEMS.map((item) => {
-                const mode = item.queryMode === 'configured' ? settings.searchQueryMode : item.queryMode;
-                const suffix = item.queryMode === 'configured' ? settings.suffix : '';
+            const fallbackSettings = normalizeSettings({});
+            const fallback = DEFAULT_MENU_ITEMS.map((item) => {
+                const mode = item.queryMode === 'configured' ? fallbackSettings.searchQueryMode : item.queryMode;
+                const suffix = item.queryMode === 'configured' ? fallbackSettings.suffix : '';
                 const query = buildQuery(title, year, mode, suffix);
                 const titleQuery = buildQuery(title, year, 'title', '');
                 const titleYearQuery = buildQuery(title, year, 'titleYear', '');
                 return {
                     text: item.name,
-                    url: buildUrl(item.url, query, settings, item.queryMode),
-                    urlTitle: buildUrl(item.url, titleQuery, settings, item.queryMode),
-                    urlTitleYear: buildUrl(item.url, titleYearQuery, settings, item.queryMode),
-                    iconUrl: getFaviconUrl(item.url, settings)
+                    url: buildUrl(item.url, query, fallbackSettings, item.queryMode),
+                    urlTitle: buildUrl(item.url, titleQuery, fallbackSettings, item.queryMode),
+                    urlTitleYear: buildUrl(item.url, titleYearQuery, fallbackSettings, item.queryMode),
+                    iconUrl: getFaviconUrl(item.url, fallbackSettings)
                 };
             });
+            return { items: fallback, resolve: () => Promise.resolve(fallback) };
         }
     }
 
@@ -691,23 +660,29 @@
         const listContainer = document.createElement('div');
         listContainer.style.padding = '8px 0';
 
+        function renderItemList(items) {
+            listContainer.innerHTML = '';
+            items.forEach((item, index) => {
+                if (item.isDivider) {
+                    const divider = document.createElement('div');
+                    divider.style.cssText = `border-top:1px solid ${borderColor};margin:0;width:100%;`;
+                    listContainer.appendChild(divider);
+                    return;
+                }
+                listContainer.appendChild(createMenuLink(item));
+                if (index < items.length - 1 && !items[index + 1]?.isDivider) {
+                    const divider = document.createElement('div');
+                    divider.style.cssText = `border-top:1px solid ${borderColor};margin:0;width:100%;`;
+                    listContainer.appendChild(divider);
+                }
+            });
+        }
+
         function renderMenuItems(profileId) {
             listContainer.innerHTML = '';
-            getMenuItems(title, year, profileId).then((items) => {
-                items.forEach((item, index) => {
-                    if (item.isDivider) {
-                        const divider = document.createElement('div');
-                        divider.style.cssText = `border-top:1px solid ${borderColor};margin:0;width:100%;`;
-                        listContainer.appendChild(divider);
-                        return;
-                    }
-                    listContainer.appendChild(createMenuLink(item));
-                    if (index < items.length - 1 && !items[index + 1]?.isDivider) {
-                        const divider = document.createElement('div');
-                        divider.style.cssText = `border-top:1px solid ${borderColor};margin:0;width:100%;`;
-                        listContainer.appendChild(divider);
-                    }
-                });
+            getMenuItems(title, year, profileId).then(({ items, resolve }) => {
+                renderItemList(items);
+                resolve().then(updated => { renderItemList(updated); });
             });
         }
 

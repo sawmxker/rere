@@ -68,6 +68,46 @@ function resolveUrl(itemUrl, data, query) {
     return url.replace(/\{query\}/g, query);
 }
 
+let _jikanQueue = Promise.resolve();
+let _imdbQueue = Promise.resolve();
+
+async function _rateLimitedFetch(url) {
+    const isJikan = url.includes('api.jikan.moe');
+    const minGap = isJikan ? 1100 : 500;
+    const prev = isJikan ? _jikanQueue : _imdbQueue;
+
+    const next = (async () => {
+        await prev;
+        await new Promise(r => setTimeout(r, minGap));
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const res = await fetch(url, { credentials: "omit", referrerPolicy: "no-referrer" });
+                if (res.status === 429 || res.status === 504) {
+                    await new Promise(r => setTimeout(r, (1 << attempt) * 1000));
+                    continue;
+                }
+                if (!res.ok) return null;
+                return await res.json();
+            } catch {
+                await new Promise(r => setTimeout(r, (1 << attempt) * 1000));
+            }
+        }
+        return null;
+    })();
+
+    if (isJikan) _jikanQueue = next;
+    else _imdbQueue = next;
+
+    return next;
+}
+
+browser.runtime.onMessage.addListener((msg, sender) => {
+    if (msg.type === "apiFetch") {
+        return _rateLimitedFetch(msg.url);
+    }
+});
+
 browser.contextMenus.onClicked.addListener((info, tab) => {
     if (!info.selectionText) return;
     const query = encodeURIComponent(info.selectionText.trim());

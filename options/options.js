@@ -13,6 +13,14 @@ const DEFAULT_MENU_ITEMS = [
     { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "title", builtIn: true }
 ];
 
+const DEFAULT_MAL_MENU_ITEMS = [
+    { id: "menu_search", name: "Search in new tab", url: "__DEFAULT_ENGINE__", queryMode: "titleYear", builtIn: true, usesSelectedEngine: true },
+    { id: "menu_youtube", name: "Search YouTube", url: "https://www.youtube.com/results?search_query={query}", queryMode: "title", builtIn: true },
+    { id: 'menu_imdb', name: 'Search IMDb', url: 'https://www.imdb.com/find/?q={query}', queryMode: 'titleYear', builtIn: true, imdbApiMode: 'none' },
+    { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?tab=all&query={query}", queryMode: "title", builtIn: true },
+    { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "title", builtIn: true }
+];
+
 const SITE_OPTIONS = [
     { value: "\u2014", label: "\u2014" },
     { value: "imdb", label: "imdb" },
@@ -36,7 +44,7 @@ const DEFAULT_PROFILES_CONFIG = [
         site: "mal-anime",
         suffix: "watch",
         searchQueryMode: "titleYear",
-        menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
+        menuItems: DEFAULT_MAL_MENU_ITEMS.map(i => ({ ...i })),
         customEngines: []
     },
     {
@@ -45,7 +53,7 @@ const DEFAULT_PROFILES_CONFIG = [
         site: "mal-manga",
         suffix: "read",
         searchQueryMode: "titleYear",
-        menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
+        menuItems: DEFAULT_MAL_MENU_ITEMS.map(i => ({ ...i })),
         customEngines: []
     }
 ];
@@ -64,22 +72,11 @@ const DEFAULT_SETTINGS = {
     searchEngineId: "google",
     searchQueryMode: "titleYear",
     searchEngines: DEFAULT_SEARCH_ENGINES,
-    menuItems: DEFAULT_MENU_ITEMS,
+    menuItems: DEFAULT_MAL_MENU_ITEMS,
     customEngines: []
 };
 
 const DEFAULT_PROFILE_IDS = DEFAULT_PROFILES_CONFIG.map(p => p.id);
-
-const YANDEX_DOMAINS = [
-    "yandex.com",
-    "yandex.ru",
-    "yandex.by",
-    "yandex.kz",
-    "yandex.ua",
-    "yandex.com.tr",
-    "ya.ru",
-    "kinopoisk.ru"
-];
 
 let state = createDefaultState();
 let isDirty = false;
@@ -107,7 +104,8 @@ function createDefaultState() {
         contextMenuEnabled: true,
         imdbButtonLabel: "reresearch",
         malButtonLabel: "reresearch",
-        malQuickLink: true
+        malQuickLink: true,
+        imdbQuickLink: true
     };
 }
 
@@ -229,20 +227,6 @@ function extractDomainsFromUrl(url) {
     return domains;
 }
 
-function isYandexUrl(url) {
-    const lower = (url || "").toLowerCase();
-    return YANDEX_DOMAINS.some((domain) => lower.includes(domain));
-}
-
-function getYandexWarningHtml() {
-    return `
-        <div class="warning-title">Warning: Yandex Search Engine Detected</div>
-        <div class="warning-item"><strong>Restricted access:</strong> a large part of resources may be unavailable or suppressed due to current Russian legislation and filtering practices.</div>
-        <div class="warning-item"><strong>Regional bias:</strong> results are strongly tied to local region settings and can be much worse for foreign-language or non-Russian sources.</div>
-        <div class="warning-item"><strong>Commercial and platform bias:</strong> official and independent resources can be buried under ads and Yandex-owned pages.</div>
-    `;
-}
-
 function isValidHttpUrl(url) {
     const normalized = ensureQueryPlaceholder(url);
     if (!normalized || normalized === "__DEFAULT_ENGINE__") {
@@ -273,6 +257,7 @@ function normalizeSearchEngine(raw, fallback = {}) {
 function normalizeMenuItem(raw, fallback = {}) {
     const url = raw?.usesSelectedEngine ? "__DEFAULT_ENGINE__" : raw?.url ?? fallback.url ?? "";
     const rawMalMode = raw?.malApiMode || fallback.malApiMode || "none";
+    const rawImdbMode = raw?.imdbApiMode || fallback.imdbApiMode || "none";
     return {
         id: raw?.id || fallback.id || makeId("menu"),
         name: (raw?.name || fallback.name || "Quick Search Item").trim(),
@@ -281,7 +266,8 @@ function normalizeMenuItem(raw, fallback = {}) {
         builtIn: Boolean(raw?.builtIn ?? fallback.builtIn),
         usesSelectedEngine: url === "__DEFAULT_ENGINE__" || Boolean(raw?.usesSelectedEngine ?? fallback.usesSelectedEngine),
         iconUrl: raw?.iconUrl || "",
-        malApiMode: ["none", "split", "always"].includes(rawMalMode) ? rawMalMode : "none"
+        malApiMode: ["none", "split", "always"].includes(rawMalMode) ? rawMalMode : "none",
+        imdbApiMode: ["none", "split", "always"].includes(rawImdbMode) ? rawImdbMode : "none"
     };
 }
 
@@ -292,7 +278,8 @@ function normalizeCustomEngine(raw) {
         url: ensureQueryPlaceholder(raw?.url || ""),
         queryMode: normalizeQueryMode(raw?.queryMode, "titleYear"),
         iconUrl: raw?.iconUrl || "",
-        malApiMode: ["none", "split", "always"].includes(raw?.malApiMode) ? raw.malApiMode : "none"
+        malApiMode: ["none", "split", "always"].includes(raw?.malApiMode) ? raw.malApiMode : "none",
+        imdbApiMode: ["none", "split", "always"].includes(raw?.imdbApiMode) ? raw.imdbApiMode : "none"
     };
 }
 function normalizeSettings(raw) {
@@ -329,15 +316,34 @@ function normalizeSettings(raw) {
         DEFAULT_PROFILES_CONFIG.forEach((def) => {
             const existing = raw.profiles[def.id];
             if (existing) {
+                let migratedItems;
+                if (Array.isArray(existing.menuItems) && existing.menuItems.length > 0) {
+                    migratedItems = existing.menuItems.map((item, index) => normalizeMenuItem(item, def.menuItems[index] || def.menuItems[0]));
+                    if (def.id.startsWith("mal-")) {
+                        migratedItems = migratedItems.filter(i => i.id !== "menu_mal");
+                        if (!migratedItems.some(i => i.id === "menu_imdb")) {
+                            migratedItems.unshift({
+                                id: "menu_imdb",
+                                name: "Search IMDb",
+                                url: "https://www.imdb.com/find/?q={query}",
+                                queryMode: "titleYear",
+                                builtIn: true,
+                                imdbApiMode: "none",
+                                usesSelectedEngine: false,
+                                iconUrl: ""
+                            });
+                        }
+                    }
+                } else {
+                    migratedItems = def.menuItems.map(i => ({ ...i }));
+                }
                 next.profiles[def.id] = {
                     id: def.id,
                     name: existing.name || def.name,
                     site: SITE_OPTIONS.some(s => s.value === existing.site) ? existing.site : (def.site || "\u2014"),
                     suffix: typeof existing.suffix === "string" ? existing.suffix : def.suffix,
                     searchQueryMode: normalizeQueryMode(existing.searchQueryMode, def.searchQueryMode),
-                    menuItems: Array.isArray(existing.menuItems) && existing.menuItems.length > 0
-                        ? existing.menuItems.map((item, index) => normalizeMenuItem(item, def.menuItems[index] || def.menuItems[0]))
-                        : def.menuItems.map(i => ({ ...i })),
+                    menuItems: migratedItems,
                     customEngines: Array.isArray(existing.customEngines)
                         ? existing.customEngines.map(normalizeCustomEngine)
                         : []
@@ -395,6 +401,7 @@ function normalizeSettings(raw) {
     if (raw.imdbButtonLabel === "search" || raw.imdbButtonLabel === "reresearch") next.imdbButtonLabel = raw.imdbButtonLabel;
     if (raw.malButtonLabel === "search" || raw.malButtonLabel === "reresearch") next.malButtonLabel = raw.malButtonLabel;
     if (typeof raw.malQuickLink === "boolean") next.malQuickLink = raw.malQuickLink;
+    if (typeof raw.imdbQuickLink === "boolean") next.imdbQuickLink = raw.imdbQuickLink;
 
     const active = next.profiles[next.activeProfileId];
     if (active) {
@@ -425,24 +432,26 @@ function serializeSettings() {
             site: p.site || "\u2014",
             suffix: p.suffix,
             searchQueryMode: p.searchQueryMode,
-            menuItems: p.menuItems.map((item) => ({
-                id: item.id,
-                name: item.name.trim(),
-                url: item.usesSelectedEngine ? "__DEFAULT_ENGINE__" : ensureQueryPlaceholder(item.url),
-                queryMode: normalizeQueryMode(item.queryMode),
-                builtIn: Boolean(item.builtIn),
-                usesSelectedEngine: Boolean(item.usesSelectedEngine),
-                iconUrl: item.iconUrl || "",
-                malApiMode: item.malApiMode || "none"
-            })),
-            customEngines: p.customEngines.map((item) => ({
-                id: item.id,
-                name: item.name.trim(),
-                url: ensureQueryPlaceholder(item.url),
-                queryMode: normalizeQueryMode(item.queryMode),
-                iconUrl: item.iconUrl || "",
-                malApiMode: item.malApiMode || "none"
-            }))
+                menuItems: p.menuItems.map((item) => ({
+                    id: item.id,
+                    name: item.name.trim(),
+                    url: item.usesSelectedEngine ? "__DEFAULT_ENGINE__" : ensureQueryPlaceholder(item.url),
+                    queryMode: normalizeQueryMode(item.queryMode),
+                    builtIn: Boolean(item.builtIn),
+                    usesSelectedEngine: Boolean(item.usesSelectedEngine),
+                    iconUrl: item.iconUrl || "",
+                    malApiMode: item.malApiMode || "none",
+                    imdbApiMode: item.imdbApiMode || "none"
+                })),
+                customEngines: p.customEngines.map((item) => ({
+                    id: item.id,
+                    name: item.name.trim(),
+                    url: ensureQueryPlaceholder(item.url),
+                    queryMode: normalizeQueryMode(item.queryMode),
+                    iconUrl: item.iconUrl || "",
+                    malApiMode: item.malApiMode || "none",
+                    imdbApiMode: item.imdbApiMode || "none"
+                }))
         };
     });
 
@@ -468,7 +477,8 @@ function serializeSettings() {
             builtIn: Boolean(item.builtIn),
             usesSelectedEngine: Boolean(item.usesSelectedEngine),
             iconUrl: item.iconUrl || "",
-            malApiMode: item.malApiMode || "none"
+            malApiMode: item.malApiMode || "none",
+            imdbApiMode: item.imdbApiMode || "none"
         })),
         customEngines: state.customEngines.map((item) => ({
             id: item.id,
@@ -476,7 +486,8 @@ function serializeSettings() {
             url: ensureQueryPlaceholder(item.url),
             queryMode: normalizeQueryMode(item.queryMode),
             iconUrl: item.iconUrl || "",
-            malApiMode: item.malApiMode || "none"
+            malApiMode: item.malApiMode || "none",
+            imdbApiMode: item.imdbApiMode || "none"
         })),
         customSearchUrl: "",
         emptyProfilesByDefault: state.emptyProfilesByDefault,
@@ -487,7 +498,8 @@ function serializeSettings() {
         contextMenuEnabled: state.contextMenuEnabled,
         imdbButtonLabel: state.imdbButtonLabel,
         malButtonLabel: state.malButtonLabel,
-        malQuickLink: state.malQuickLink
+        malQuickLink: state.malQuickLink,
+        imdbQuickLink: state.imdbQuickLink
     };
 }
 
@@ -553,7 +565,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const engineSelect = document.getElementById("searchEngine");
     const searchQueryModeSelect = document.getElementById("searchQueryMode");
     const searchPreview = document.getElementById("searchPreview");
-    const searchYandexWarning = document.getElementById("searchYandexWarning");
     const saveBtn = document.getElementById("saveBtn");
     const resetBtn = document.getElementById("resetBtn");
     const exportTriggerBtn = document.getElementById("exportTriggerBtn");
@@ -565,7 +576,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const defaultEngineUrlInput = document.getElementById("defaultEngineUrl");
     const addDefaultEngineBtn = document.getElementById("addDefaultEngineBtn");
     const defaultBuilderPreview = document.getElementById("defaultBuilderPreview");
-    const defaultBuilderWarning = document.getElementById("defaultBuilderWarning");
     const defaultEnginesList = document.getElementById("defaultEnginesList");
 
     const pickFromMenuBtn = document.getElementById("pickFromMenuBtn");
@@ -580,7 +590,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const customEngineQueryModeSelect = document.getElementById("customEngineQueryMode");
     const addCustomEngineBtn = document.getElementById("addCustomEngineBtn");
     const customBuilderPreview = document.getElementById("customBuilderPreview");
-    const customBuilderWarning = document.getElementById("customBuilderWarning");
     const scrollToAddBtn = document.getElementById("scrollToAddBtn");
     const defaultEnginesSection = document.getElementById("defaultEnginesSection");
     const defaultEnginesHeader = document.getElementById("defaultEnginesHeader");
@@ -655,11 +664,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         status.appendChild(dismissBtn);
     }
 
-    function setWarning(container, visible) {
-        container.innerHTML = visible ? getYandexWarningHtml() : "";
-        container.classList.toggle("show", visible);
-    }
-
     function updateEngineSelect() {
         engineSelect.innerHTML = "";
         state.searchEngines.forEach((engine) => {
@@ -682,15 +686,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             ? buildSearchUrl(selectedEngine.url, state.searchQueryMode, state.suffix)
             : "";
         searchPreview.textContent = previewUrl ? `Example: ${previewUrl}` : "Example URL will appear here.";
-        setWarning(searchYandexWarning, isYandexUrl(selectedEngine?.url || ""));
     }
 
     function updateBuilderPreview() {
         defaultBuilderPreview.textContent = `Example: ${buildSearchUrl(defaultEngineUrlInput.value || "https://example.com/search?q=", "titleYear", "")}`;
-        setWarning(defaultBuilderWarning, isYandexUrl(defaultEngineUrlInput.value));
 
         customBuilderPreview.textContent = `Example: ${buildSearchUrl(customEngineUrlInput.value || "https://example.com/search?q=", customEngineQueryModeSelect.value, "")}`;
-        setWarning(customBuilderWarning, isYandexUrl(customEngineUrlInput.value));
     }
     function updateTitleBlock(container, item, subtitleText) {
         const titleText = document.createElement("div");
@@ -711,7 +712,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function createQueryModeSelect(value, allowConfigured = false) {
         const select = document.createElement("select");
-        select.innerHTML = `${allowConfigured ? '<option value="configured">configured default</option>' : ''}<option value="title">title</option><option value="titleYear">title+year</option>`;
+        if (allowConfigured) {
+            const opt = document.createElement('option');
+            opt.value = 'configured';
+            opt.textContent = 'configured default';
+            select.appendChild(opt);
+        }
+        const opt1 = document.createElement('option');
+        opt1.value = 'title';
+        opt1.textContent = 'title';
+        select.appendChild(opt1);
+        const opt2 = document.createElement('option');
+        opt2.value = 'titleYear';
+        opt2.textContent = 'title+year';
+        select.appendChild(opt2);
         select.value = normalizeQueryMode(value, allowConfigured ? "configured" : "titleYear");
         return select;
     }
@@ -814,14 +828,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         fields.appendChild(nameWrap);
         fields.appendChild(urlWrap);
 
-        const warning = document.createElement("div");
-        warning.className = `warning-box${isYandexUrl(engine.url) ? " show" : ""}`;
-        if (isYandexUrl(engine.url)) {
-            warning.innerHTML = getYandexWarningHtml();
-        }
         card.appendChild(header);
         card.appendChild(fields);
-        card.appendChild(warning);
         return card;
     }
 
@@ -926,6 +934,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         malModeWrap.appendChild(malModeSelect);
         fields.appendChild(malModeWrap);
 
+        const imdbModeWrap = document.createElement("div");
+        imdbModeWrap.style.cssText = 'display:none;';
+        imdbModeWrap.innerHTML = `<label>IMDb API mode</label>`;
+        const imdbModeSelect = document.createElement("select");
+        imdbModeSelect.innerHTML = '<option value="none">Always no (use search)</option><option value="split">Split: search + API link</option><option value="always">Always use API</option>';
+        imdbModeSelect.value = ["none", "split", "always"].includes(item.imdbApiMode) ? item.imdbApiMode : "none";
+        imdbModeSelect.addEventListener("change", () => { item.imdbApiMode = imdbModeSelect.value; isDirty = true; updateSaveButtonState(); });
+        imdbModeWrap.appendChild(imdbModeSelect);
+        fields.appendChild(imdbModeWrap);
+
         fields.appendChild(urlWrap);
 
         function updateMalModeVisibility() {
@@ -933,18 +951,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             const isMal = url.includes("myanimelist.net");
             malModeWrap.style.display = isMal ? "" : "none";
         }
-        updateMalModeVisibility();
-        urlInput.addEventListener("input", updateMalModeVisibility);
-
-        const warning = document.createElement("div");
-        const shouldWarn = !item.usesSelectedEngine && isYandexUrl(item.url);
-        warning.className = `warning-box${shouldWarn ? " show" : ""}`;
-        if (shouldWarn) {
-            warning.innerHTML = getYandexWarningHtml();
+        function updateImdbModeVisibility() {
+            const url = (item.url || "").toLowerCase();
+            const isImdb = url.includes("imdb.com");
+            imdbModeWrap.style.display = isImdb ? "" : "none";
         }
+        updateMalModeVisibility();
+        updateImdbModeVisibility();
+        urlInput.addEventListener("input", () => { updateMalModeVisibility(); updateImdbModeVisibility(); });
+
         card.appendChild(header);
         card.appendChild(fields);
-        card.appendChild(warning);
         return card;
     }
     function createCustomEngineCard(item, index) {
@@ -1005,24 +1022,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         malModeWrap.appendChild(malModeSelect);
         fields.appendChild(malModeWrap);
 
+        const imdbModeWrap = document.createElement("div");
+        imdbModeWrap.style.cssText = 'display:none;';
+        imdbModeWrap.innerHTML = `<label>IMDb API mode</label>`;
+        const imdbModeSelect = document.createElement("select");
+        imdbModeSelect.innerHTML = '<option value="none">Always no (use search)</option><option value="split">Split: search + API link</option><option value="always">Always use API</option>';
+        imdbModeSelect.value = ["none", "split", "always"].includes(item.imdbApiMode) ? item.imdbApiMode : "none";
+        imdbModeSelect.addEventListener("change", () => { item.imdbApiMode = imdbModeSelect.value; isDirty = true; updateSaveButtonState(); });
+        imdbModeWrap.appendChild(imdbModeSelect);
+        fields.appendChild(imdbModeWrap);
+
         function updateMalModeVisibility() {
             const url = (item.url || "").toLowerCase();
             const isMal = url.includes("myanimelist.net");
             malModeWrap.style.display = isMal ? "" : "none";
         }
+        function updateImdbModeVisibility() {
+            const url = (item.url || "").toLowerCase();
+            const isImdb = url.includes("imdb.com");
+            imdbModeWrap.style.display = isImdb ? "" : "none";
+        }
         updateMalModeVisibility();
-        urlInput.addEventListener("input", updateMalModeVisibility);
+        updateImdbModeVisibility();
+        urlInput.addEventListener("input", () => { updateMalModeVisibility(); updateImdbModeVisibility(); });
 
         fields.appendChild(urlWrap);
 
-        const warning = document.createElement("div");
-        warning.className = `warning-box${isYandexUrl(item.url) ? " show" : ""}`;
-        if (isYandexUrl(item.url)) {
-            warning.innerHTML = getYandexWarningHtml();
-        }
         card.appendChild(header);
         card.appendChild(fields);
-        card.appendChild(warning);
         return card;
     }
 
@@ -1264,6 +1291,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         setChecked("malEnabledToggle", state.malEnabled);
         setChecked("contextMenuToggle", state.contextMenuEnabled);
         setChecked("malQuickLinkToggle", state.malQuickLink);
+        setChecked("imdbQuickLinkToggle", state.imdbQuickLink);
         setVal("imdbButtonLabelSelect", state.imdbButtonLabel);
         setVal("malButtonLabelSelect", state.malButtonLabel);
     }
@@ -1380,7 +1408,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             site: "\u2014",
             suffix: DEFAULT_SETTINGS.suffix,
             searchQueryMode: DEFAULT_SETTINGS.searchQueryMode,
-            menuItems: state.emptyProfilesByDefault ? [] : DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
+            menuItems: state.emptyProfilesByDefault ? [] : [{ id: "menu_search", name: "Search in new tab", url: "__DEFAULT_ENGINE__", queryMode: "titleYear", builtIn: true, usesSelectedEngine: true }],
             customEngines: []
         };
         state.profiles[id] = newProfile;
@@ -1474,7 +1502,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             showStatus("URL must start with http:// or https://", "error");
             return;
         }
-        state.customEngines.push({ id: makeId("custom"), name, url: ensureQueryPlaceholder(url), queryMode: normalizeQueryMode(queryMode), malApiMode: "none" });
+        state.customEngines.push({ id: makeId("custom"), name, url: ensureQueryPlaceholder(url), queryMode: normalizeQueryMode(queryMode), malApiMode: "none", imdbApiMode: "none" });
         customEngineNameInput.value = "";
         customEngineUrlInput.value = "";
         customEngineQueryModeSelect.value = "titleYear";
@@ -1489,10 +1517,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     function populatePicker() {
-        pickerList.innerHTML = "";
+        pickerList.textContent = '';
         const allItems = [...state.menuItems, ...state.customEngines];
         if (allItems.length === 0) {
-            pickerList.innerHTML = '<div class="empty-state">No menu items yet.</div>';
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = 'No menu items yet.';
+            pickerList.appendChild(empty);
             return;
         }
         allItems.forEach((item) => {
@@ -1504,7 +1535,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             el.appendChild(createFaviconElement(url, item.name));
             const textWrap = document.createElement("div");
             textWrap.style.minWidth = "0";
-            textWrap.innerHTML = `<div class="picker-item-name">${item.name}</div><div class="picker-item-url">${url}</div>`;
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'picker-item-name';
+            nameDiv.textContent = item.name;
+            textWrap.appendChild(nameDiv);
+            const urlDiv = document.createElement('div');
+            urlDiv.className = 'picker-item-url';
+            urlDiv.textContent = url;
+            textWrap.appendChild(urlDiv);
             el.appendChild(textWrap);
             el.addEventListener("click", () => {
                 defaultEngineNameInput.value = item.name;
@@ -2124,6 +2162,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     bindToggle("malEnabledToggle", "malEnabled");
     bindToggle("contextMenuToggle", "contextMenuEnabled");
     bindToggle("malQuickLinkToggle", "malQuickLink");
+    bindToggle("imdbQuickLinkToggle", "imdbQuickLink");
     bindSelect("imdbButtonLabelSelect", "imdbButtonLabel");
     bindSelect("malButtonLabelSelect", "malButtonLabel");
 

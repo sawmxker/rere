@@ -23,7 +23,6 @@
             --accent-blue: #2563eb;
             --accent-blue-hover: #1d4ed8;
             --danger: #de3217;
-            --danger-soft: #2a1f1f;
             --success-bg: #192ce0;
             --success-text: #bdadff;
         }
@@ -153,40 +152,6 @@
             font-size: 11px;
             color: #b2d367;
             word-break: break-all;
-        }
-
-        .warning-box {
-            background: var(--danger-soft);
-            border: 1px solid var(--danger);
-            border-radius: 8px;
-            padding: 16px;
-            margin-top: 12px;
-            display: none;
-        }
-
-        .warning-box.show {
-            display: block;
-        }
-
-        .warning-title {
-            color: var(--danger);
-            font-weight: 600;
-            margin-bottom: 12px;
-            font-size: 15px;
-        }
-
-        .warning-item {
-            margin-bottom: 10px;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
-        .warning-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .warning-item strong {
-            color: #ffc199;
         }
 
         .engine-card {
@@ -839,7 +804,6 @@
             </div>
 
             <div id="searchPreview" class="preview"></div>
-            <div id="searchYandexWarning" class="warning-box"></div>
         </div>
 
         <div class="section" id="defaultEnginesSection">
@@ -869,7 +833,6 @@
 
                     <button type="button" id="addDefaultEngineBtn" class="mini-btn" style="margin-top: 16px;">Add Default Search Engine</button>
                     <div id="defaultBuilderPreview" class="preview" style="margin-top: 16px;"></div>
-                    <div id="defaultBuilderWarning" class="warning-box"></div>
                 </div>
 
                 <div id="defaultEnginesList"></div>
@@ -959,7 +922,6 @@
 
                     <button type="button" id="addCustomEngineBtn" class="mini-btn" style="margin-top: 16px;">Add Search Engine</button>
                     <div id="customBuilderPreview" class="preview" style="margin-top: 16px;"></div>
-                    <div id="customBuilderWarning" class="warning-box"></div>
                 </div>
             </div>
         </div>
@@ -1003,6 +965,17 @@
                         <option value="reresearch">reré:Search</option>
                         <option value="search">Search</option>
                     </select>
+                </div>
+
+                <div class="toggle-row">
+                    <div>
+                        <div class="toggle-label">IMDb Quick Link (suggestion API)</div>
+                        <div class="toggle-desc">When enabled, uses the IMDb suggestion API to find IMDb pages from other sources (MAL, etc.) and adds a direct link in the search modal.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="imdbQuickLinkToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
 
                 <h3 style="margin:20px 0 12px 0;font-size:15px;color:var(--accent);">MyAnimeList</h3>
