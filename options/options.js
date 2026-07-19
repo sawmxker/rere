@@ -105,7 +105,6 @@ function createDefaultState() {
         imdbButtonLabel: "reresearch",
         malButtonLabel: "reresearch",
         malQuickLink: true,
-        imdbQuickLink: true,
         searchTitleMode: "original"
     };
 }
@@ -416,7 +415,6 @@ function normalizeSettings(raw) {
     if (raw.imdbButtonLabel === "search" || raw.imdbButtonLabel === "reresearch") next.imdbButtonLabel = raw.imdbButtonLabel;
     if (raw.malButtonLabel === "search" || raw.malButtonLabel === "reresearch") next.malButtonLabel = raw.malButtonLabel;
     if (typeof raw.malQuickLink === "boolean") next.malQuickLink = raw.malQuickLink;
-    if (typeof raw.imdbQuickLink === "boolean") next.imdbQuickLink = raw.imdbQuickLink;
     if (raw.searchTitleMode === "original" || raw.searchTitleMode === "english") next.searchTitleMode = raw.searchTitleMode;
 
     const active = next.profiles[next.activeProfileId];
@@ -515,7 +513,6 @@ function serializeSettings() {
         imdbButtonLabel: state.imdbButtonLabel,
         malButtonLabel: state.malButtonLabel,
         malQuickLink: state.malQuickLink,
-        imdbQuickLink: state.imdbQuickLink,
         searchTitleMode: state.searchTitleMode
     };
 }
@@ -1310,7 +1307,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         setChecked("malEnabledToggle", state.malEnabled);
         setChecked("contextMenuToggle", state.contextMenuEnabled);
         setChecked("malQuickLinkToggle", state.malQuickLink);
-        setChecked("imdbQuickLinkToggle", state.imdbQuickLink);
         setVal("imdbButtonLabelSelect", state.imdbButtonLabel);
         setVal("malButtonLabelSelect", state.malButtonLabel);
     }
@@ -2188,7 +2184,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     bindToggle("malEnabledToggle", "malEnabled");
     bindToggle("contextMenuToggle", "contextMenuEnabled");
     bindToggle("malQuickLinkToggle", "malQuickLink");
-    bindToggle("imdbQuickLinkToggle", "imdbQuickLink");
     bindSelect("imdbButtonLabelSelect", "imdbButtonLabel");
     bindSelect("malButtonLabelSelect", "malButtonLabel");
 

@@ -167,7 +167,6 @@
         }
 
         const searchTitleMode = data.searchTitleMode === 'english' ? 'english' : 'original';
-        const imdbQuickLink = typeof data.imdbQuickLink === 'boolean' ? data.imdbQuickLink : true;
 
         return {
             suffix,
@@ -176,8 +175,7 @@
             searchEngines,
             menuItems,
             customEngines,
-            searchTitleMode,
-            imdbQuickLink
+            searchTitleMode
         };
     }
 
@@ -559,20 +557,6 @@
             for (const rawItem of settings.menuItems) processItem(rawItem);
             if (settings.customEngines.length > 0 && items.length > 0) items.push({ isDivider: true });
             for (const rawItem of settings.customEngines) processItem(rawItem);
-
-            if (settings.imdbQuickLink) {
-                apiTasks.push(_imdbSearchCached(title, year, imdbCache).then(url => {
-                    if (url && !hasImdbApiItem) {
-                        items.unshift({
-                            text: 'Open on IMDb',
-                            url: url,
-                            urlTitle: url,
-                            urlTitleYear: url,
-                            iconUrl: 'https://www.imdb.com/favicon.ico'
-                        });
-                    }
-                }));
-            }
 
             return {
                 items,
