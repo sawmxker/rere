@@ -65,7 +65,13 @@ function resolveUrl(itemUrl, data, query) {
         const engine = engines.find(e => e.id === engineId);
         url = (engine ? engine.url : "https://www.google.com/search?q={query}");
     }
-    return url.replace(/\{query\}/g, query);
+    let result = url
+        .replace(/\{query\}/g, query)
+        .replace(/\{title\}/g, query);
+    if (result.includes('{year}')) {
+        result = result.replace(/\{year\}/g, '').replace(/&release_date=[^&]*/g, '');
+    }
+    return result;
 }
 
 let _jikanQueue = Promise.resolve();
