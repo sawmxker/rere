@@ -637,6 +637,8 @@
         searchQueryModeSelect.value = state.searchQueryMode;
         suffixInput.value = state.suffix;
         searchTitleModeSelect.value = state.searchTitleMode || 'original';
+        const grMode = document.getElementById("searchTitleModeGR");
+        if (grMode) grMode.value = state.searchTitleModeGR || 'edition';
         renderDefaultEngines();
         renderMenuItems();
         updateSearchPreview();
@@ -658,6 +660,7 @@
         setChecked("imdbEnabledToggle", state.imdbEnabled);
         setChecked("malEnabledToggle", state.malEnabled);
         setChecked("grEnabledToggle", state.grEnabled);
+        setChecked("grSubtleBorderToggle", state.grSubtleBorder);
         setChecked("contextMenuToggle", state.contextMenuEnabled);
         setChecked("malQuickLinkToggle", state.malQuickLink);
         setVal("imdbButtonLabelSelect", state.imdbButtonLabel);
@@ -1039,6 +1042,14 @@
             isDirty = true;
             updateSaveButtonState();
         });
+        const grMode = document.getElementById("searchTitleModeGR");
+        if (grMode) {
+            grMode.addEventListener("change", () => {
+                state.searchTitleModeGR = grMode.value;
+                isDirty = true;
+                updateSaveButtonState();
+            });
+        }
         profileSelect.addEventListener("change", () => {
             const newId = profileSelect.value;
             if (!newId || newId === state.activeProfileId) return;
@@ -1203,6 +1214,7 @@
         bindToggle("imdbEnabledToggle", "imdbEnabled");
         bindToggle("malEnabledToggle", "malEnabled");
         bindToggle("grEnabledToggle", "grEnabled");
+        bindToggle("grSubtleBorderToggle", "grSubtleBorder");
         bindToggle("contextMenuToggle", "contextMenuEnabled");
         bindToggle("malQuickLinkToggle", "malQuickLink");
         bindSelect("imdbButtonLabelSelect", "imdbButtonLabel");

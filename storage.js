@@ -112,7 +112,9 @@ function _extractDomains(state) {
         imdbButtonLabel: state.imdbButtonLabel,
         malButtonLabel: state.malButtonLabel,
         malQuickLink: state.malQuickLink,
-        searchTitleMode: state.searchTitleMode
+        searchTitleMode: state.searchTitleMode,
+        searchTitleModeGR: state.searchTitleModeGR,
+        grSubtleBorder: state.grSubtleBorder
     };
     if (state.searchEngines) {
         d._e = state.searchEngines.map(e => ({

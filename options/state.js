@@ -83,7 +83,9 @@ window.__RERE_OPTIONS_STATE__ = (function () {
             imdbButtonLabel: "reresearch",
             malButtonLabel: "reresearch",
             malQuickLink: true,
-            searchTitleMode: "original"
+            searchTitleMode: "original",
+            searchTitleModeGR: "edition",
+            grSubtleBorder: false
         };
     }
 
@@ -352,11 +354,13 @@ window.__RERE_OPTIONS_STATE__ = (function () {
         if (typeof raw.imdbEnabled === "boolean") next.imdbEnabled = raw.imdbEnabled;
         if (typeof raw.malEnabled === "boolean") next.malEnabled = raw.malEnabled;
         if (typeof raw.grEnabled === "boolean") next.grEnabled = raw.grEnabled;
+        if (typeof raw.grSubtleBorder === "boolean") next.grSubtleBorder = raw.grSubtleBorder;
         if (typeof raw.contextMenuEnabled === "boolean") next.contextMenuEnabled = raw.contextMenuEnabled;
         if (raw.imdbButtonLabel === "search" || raw.imdbButtonLabel === "reresearch") next.imdbButtonLabel = raw.imdbButtonLabel;
         if (raw.malButtonLabel === "search" || raw.malButtonLabel === "reresearch") next.malButtonLabel = raw.malButtonLabel;
         if (typeof raw.malQuickLink === "boolean") next.malQuickLink = raw.malQuickLink;
         if (raw.searchTitleMode === "original" || raw.searchTitleMode === "english") next.searchTitleMode = raw.searchTitleMode;
+        if (raw.searchTitleModeGR === "edition" || raw.searchTitleModeGR === "original") next.searchTitleModeGR = raw.searchTitleModeGR;
         const active = next.profiles[next.activeProfileId];
         if (active) {
             next.suffix = active.suffix;
@@ -442,7 +446,9 @@ window.__RERE_OPTIONS_STATE__ = (function () {
             imdbButtonLabel: state.imdbButtonLabel,
             malButtonLabel: state.malButtonLabel,
             malQuickLink: state.malQuickLink,
-            searchTitleMode: state.searchTitleMode
+            searchTitleMode: state.searchTitleMode,
+            searchTitleModeGR: state.searchTitleModeGR,
+            grSubtleBorder: state.grSubtleBorder
         };
     }
 

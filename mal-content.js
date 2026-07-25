@@ -26,10 +26,37 @@
             title = titleEl.innerText.replace(/\s*\(TV.*?\)\s*$/, '').replace(/\s*\(Movie\)\s*$/, '').replace(/\s*\(\w+ \d{4}\)\s*$/, '').trim();
         }
         let englishTitle = '';
-        const englishEl = document.querySelector('p.title-english.title-inherit');
+        const englishEl = document.querySelector('p.title-english.title-inherit') ||
+                          document.querySelector('.title-english') ||
+                          document.querySelector('span[itemprop="alternateName"]') ||
+                          document.querySelector('[property="og:title"]');
         if (englishEl) {
             englishTitle = englishEl.innerText.trim();
         }
+        if (!englishTitle) {
+            const altTitles = document.querySelector('.js-alternative-titles');
+            if (altTitles) {
+                const rows = altTitles.querySelectorAll('.title');
+                for (const row of rows) {
+                    const label = row.querySelector('span');
+                    if (label && /english/i.test(label.textContent)) {
+                        const txt = row.textContent.replace(label.textContent, '').trim();
+                        if (txt) { englishTitle = txt; break; }
+                    }
+                }
+            }
+        }
+        if (!englishTitle) {
+            const script = document.querySelector('script[type="application/ld+json"]');
+            if (script) {
+                try {
+                    const json = JSON.parse(script.textContent);
+                    const alt = json?.alternativeHeadline || json?.alternateName;
+                    if (alt) englishTitle = alt;
+                } catch (e) {}
+            }
+        }
+        console.log('rere MAL debug: title=' + title + ' englishTitle="' + englishTitle + '"');
         let year = '';
         const h1 = document.querySelector('h1');
         if (h1) {
@@ -286,9 +313,9 @@
             origBtn.style.color = active ? t.mutedColor : t.bgColor;
             engBtn.style.background = active ? t.mutedColor : 'transparent';
             engBtn.style.color = active ? t.bgColor : t.mutedColor;
-            const t = active ? englishTitle : title;
-            updateTitleDisplay(t);
-            renderMenuItems(profileSelect.value, t);
+            const ti = active ? englishTitle : title;
+            updateTitleDisplay(ti);
+            renderMenuItems(profileSelect.value, ti);
         }
         origBtn.onclick = () => { if (usingEnglish) switchTitle(false); };
         engBtn.onclick = () => { if (!usingEnglish && englishTitle) switchTitle(true); };
