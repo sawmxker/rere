@@ -1008,6 +1008,19 @@
                     <div class="help-text">Which title to use when searching from MAL pages. English title often gives better IMDb results.</div>
                 </div>
 
+                <h3 style="margin:20px 0 12px 0;font-size:15px;color:var(--accent);">Goodreads</h3>
+
+                <div class="toggle-row">
+                    <div>
+                        <div class="toggle-label">Enable on Goodreads</div>
+                        <div class="toggle-desc">Show the search button and functionality on Goodreads book pages.</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="grEnabledToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
                 <h3 style="margin:20px 0 12px 0;font-size:15px;color:var(--accent);">Profiles</h3>
 
                 <div class="toggle-row">
@@ -1079,6 +1092,7 @@
     </div>
 
     <script src="../storage.js"></script>
+    <script src="state.js"></script>
     <script src="options.js"></script>
 </body>
 </html>

@@ -1,605 +1,21 @@
-﻿
-const DEFAULT_SEARCH_ENGINES = [
-    { id: "google", name: "Google", url: "https://www.google.com/search?q={query}", builtIn: true },
-    { id: "duckduckgo", name: "DuckDuckGo", url: "https://duckduckgo.com/?q={query}", builtIn: true },
-    { id: "bing", name: "Bing", url: "https://www.bing.com/search?q={query}", builtIn: true }
-];
+﻿(function () {
+    'use strict';
 
-const DEFAULT_MENU_ITEMS = [
-    { id: "menu_search", name: "Search in new tab", url: "__DEFAULT_ENGINE__", queryMode: "titleYear", builtIn: true, usesSelectedEngine: true },
-    { id: "menu_youtube", name: "Search YouTube", url: "https://www.youtube.com/results?search_query={query}", queryMode: "title", builtIn: true },
-    { id: 'menu_mal', name: 'Search MyAnimeList', url: 'https://myanimelist.net/search/all?q={query}', queryMode: 'title', builtIn: true, malApiMode: 'none' },
-    { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?tab=all&query={query}", queryMode: "title", builtIn: true },
-    { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "title", builtIn: true }
-];
+    const S = window.__RERE_OPTIONS_STATE__;
 
-const DEFAULT_MAL_MENU_ITEMS = [
-    { id: "menu_search", name: "Search in new tab", url: "__DEFAULT_ENGINE__", queryMode: "titleYear", builtIn: true, usesSelectedEngine: true },
-    { id: "menu_youtube", name: "Search YouTube", url: "https://www.youtube.com/results?search_query={query}", queryMode: "title", builtIn: true },
-    { id: 'menu_imdb', name: 'Search IMDb', url: 'https://www.imdb.com/search/title/?title={title}&release_date={year}-01-01,{year}-12-31&adult=include', queryMode: 'title', builtIn: true, imdbApiMode: 'none' },
-    { id: "menu_archive", name: "Search Archive.org", url: "https://archive.org/search?tab=all&query={query}", queryMode: "title", builtIn: true },
-    { id: "menu_rutracker", name: "Search RuTracker", url: "https://rutracker.org/forum/tracker.php?nm={query}", queryMode: "title", builtIn: true }
-];
-
-const SITE_OPTIONS = [
-    { value: "\u2014", label: "\u2014" },
-    { value: "imdb", label: "imdb" },
-    { value: "mal-anime", label: "myanimelist.net/anime" },
-    { value: "mal-manga", label: "myanimelist.net/manga" }
-];
-
-const DEFAULT_PROFILES_CONFIG = [
-    {
-        id: "imdb",
-        name: "IMDb",
-        site: "imdb",
-        suffix: "watch",
-        searchQueryMode: "titleYear",
-        menuItems: DEFAULT_MENU_ITEMS.map(i => ({ ...i })),
-        customEngines: []
-    },
-    {
-        id: "mal-anime",
-        name: "MAL anime",
-        site: "mal-anime",
-        suffix: "watch",
-        searchQueryMode: "titleYear",
-        menuItems: DEFAULT_MAL_MENU_ITEMS.map(i => ({ ...i })),
-        customEngines: []
-    },
-    {
-        id: "mal-manga",
-        name: "MAL manga",
-        site: "mal-manga",
-        suffix: "read",
-        searchQueryMode: "titleYear",
-        menuItems: DEFAULT_MAL_MENU_ITEMS.map(i => ({ ...i })),
-        customEngines: []
-    }
-];
-
-function cloneProfileConfig(config) {
-    return {
-        ...config,
-        site: config.site || "\u2014",
-        menuItems: config.menuItems.map(i => ({ ...i })),
-        customEngines: config.customEngines.map(i => ({ ...i }))
-    };
-}
-
-const DEFAULT_SETTINGS = {
-    suffix: "watch",
-    searchEngineId: "google",
-    searchQueryMode: "titleYear",
-    searchEngines: DEFAULT_SEARCH_ENGINES,
-    menuItems: DEFAULT_MAL_MENU_ITEMS,
-    customEngines: []
-};
-
-const DEFAULT_PROFILE_IDS = DEFAULT_PROFILES_CONFIG.map(p => p.id);
-
-let state = createDefaultState();
-let isDirty = false;
-
-function createDefaultState() {
-    const profiles = {};
-    DEFAULT_PROFILES_CONFIG.forEach((cfg) => {
-        profiles[cfg.id] = cloneProfileConfig(cfg);
-    });
-    const imdb = profiles["imdb"];
-    return {
-        suffix: imdb.suffix,
-        searchEngineId: DEFAULT_SETTINGS.searchEngineId,
-        searchQueryMode: imdb.searchQueryMode,
-        searchEngines: DEFAULT_SEARCH_ENGINES.map((item) => ({ ...item })),
-        menuItems: imdb.menuItems,
-        customEngines: imdb.customEngines,
-        profiles,
-        activeProfileId: "imdb",
-        emptyProfilesByDefault: true,
-        collapseDefaultEngines: true,
-        collapseQuickSearchMenu: false,
-        imdbEnabled: true,
-        malEnabled: true,
-        contextMenuEnabled: true,
-        imdbButtonLabel: "reresearch",
-        malButtonLabel: "reresearch",
-        malQuickLink: true,
-        searchTitleMode: "original"
-    };
-}
-
-function makeId(prefix) {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function ensureQueryPlaceholder(url) {
-    const trimmed = (url || "").trim();
-    if (!trimmed || trimmed === "__DEFAULT_ENGINE__") {
-        return trimmed;
-    }
-    const hasCustom = trimmed.includes("{title}") || trimmed.includes("{year}");
-    if (hasCustom) return trimmed;
-    return trimmed.includes("{query}") ? trimmed : `${trimmed}{query}`;
-}
-
-function getQueryText(mode) {
-    switch (mode) {
-        case "title":
-            return "Movie Title";
-        case "configured":
-        case "titleYear":
-        default:
-            return "Movie Title 2024";
-    }
-}
-
-function buildSearchUrl(url, mode, suffix = "") {
-    if (url === "__DEFAULT_ENGINE__") {
-        const selected = getSearchEngineById(state.searchEngineId);
-        if (!selected) {
-            return "";
-        }
-        url = selected.url;
-        mode = mode === "configured" ? state.searchQueryMode : mode;
-    }
-
-    const queryText = [getQueryText(mode), suffix.trim()].filter(Boolean).join(" ");
-    const sampleTitle = "Movie Title";
-    const sampleYear = "2024";
-    return ensureQueryPlaceholder(url)
-        .replace("{query}", encodeURIComponent(queryText.trim()))
-        .replace(/\{title\}/g, encodeURIComponent(sampleTitle))
-        .replace(/\{year\}/g, encodeURIComponent(sampleYear));
-}
-
-function replaceUrlPlaceholders(url, queryVal, titleVal, yearVal) {
-    return url
-        .replace(/\{query\}/g, queryVal)
-        .replace(/\{title\}/g, titleVal)
-        .replace(/\{year\}/g, yearVal);
-}
-
-function getOriginFromUrl(url) {
-    const normalized = url === "__DEFAULT_ENGINE__"
-        ? getSearchEngineById(state.searchEngineId)?.url || ""
-        : ensureQueryPlaceholder(url);
-
-    try {
-        const parsed = new URL(replaceUrlPlaceholders(normalized, "test", "test", "2000"));
-        return parsed.origin;
-    } catch (error) {
-        return "";
-    }
-}
-function extractTargetDomainFromQuery(url) {
-    try {
-        const testUrl = replaceUrlPlaceholders(url, "test", "test", "2000");
-        const parsed = new URL(testUrl);
-        const queryParams = new URLSearchParams(parsed.search);
-
-        for (const param of ['q', 'query', 'p', 's']) {
-            const value = queryParams.get(param);
-            if (!value) continue;
-            const siteMatch = value.match(/site:([^+\s&]+)/i);
-            if (siteMatch && siteMatch[1]) {
-                return siteMatch[1];
-            }
-            
-            const domainMatch = value.match(/(https?:\/\/)?(www\.)?([a-zA-Z0-9-]+\.[a-zA-Z.]{2,})/);
-            if (domainMatch && domainMatch[3]) {
-                const domain = domainMatch[3].toLowerCase();
-                const searchDomains = ['google.com', 'duckduckgo.com', 'bing.com', 'yandex.ru', 'yahoo.com'];
-                if (!searchDomains.some(sd => domain.endsWith(sd))) {
-                    return domain;
-                }
-            }
-        }
-    } catch (e) {
-    }
-    return null;
-}
-
-function getFaviconUrl(url) {
-    const targetDomain = extractTargetDomainFromQuery(url);
-    if (targetDomain) {
-        const protocol = url.startsWith('https://') ? 'https:' : 'http:';
-        return `${protocol}//${targetDomain}/favicon.ico`;
-    }
-    const normalized = url === "__DEFAULT_ENGINE__"
-        ? getSearchEngineById(state.searchEngineId)?.url || ""
-        : ensureQueryPlaceholder(url);
-    try {
-        const parsed = new URL(replaceUrlPlaceholders(normalized, "test", "test", "2000"));
-        return `${parsed.origin}/favicon.ico`;
-    } catch (error) {
-        return "";
-    }
-}
-
-function extractDomainsFromUrl(url) {
-    const domains = [];
-    try {
-        const testUrl = replaceUrlPlaceholders(url, "test", "test", "2000");
-        const parsed = new URL(testUrl);
-        const mainDomain = parsed.hostname.replace(/^www\./, "");
-        if (mainDomain) domains.push(mainDomain);
-        const queryParams = new URLSearchParams(parsed.search);
-        for (const [, value] of queryParams) {
-            const siteMatch = value.match(/site:([^+\s&]+)/i);
-            if (siteMatch && siteMatch[1]) {
-                const d = siteMatch[1].replace(/^www\./, "").toLowerCase();
-                if (!domains.includes(d)) domains.push(d);
-            }
-            const urlMatches = value.matchAll(/(https?:\/\/)?(www\.)?([a-zA-Z0-9-]+\.[a-zA-Z.]{2,})/g);
-            for (const match of urlMatches) {
-                const d = match[3].toLowerCase().replace(/^www\./, "");
-                if (!domains.includes(d)) domains.push(d);
-            }
-        }
-    } catch (e) {}
-    return domains;
-}
-
-function isValidHttpUrl(url) {
-    const normalized = ensureQueryPlaceholder(url);
-    if (!normalized || normalized === "__DEFAULT_ENGINE__") {
-        return false;
-    }
-    try {
-        const parsed = new URL(replaceUrlPlaceholders(normalized, "test", "test", "2000"));
-        return parsed.protocol === "http:" || parsed.protocol === "https:";
-    } catch (error) {
-        return false;
-    }
-}
-
-function normalizeQueryMode(mode, fallback = "titleYear") {
-    return ["title", "titleYear", "configured"].includes(mode) ? mode : fallback;
-}
-
-function normalizeSearchEngine(raw, fallback = {}) {
-    return {
-        id: raw?.id || fallback.id || makeId("engine"),
-        name: (raw?.name || fallback.name || "Search Engine").trim(),
-        url: ensureQueryPlaceholder(raw?.url || fallback.url || ""),
-        builtIn: Boolean(raw?.builtIn ?? fallback.builtIn),
-        iconUrl: raw?.iconUrl || ""
-    };
-}
-
-function normalizeMenuItem(raw, fallback = {}) {
-    const url = raw?.usesSelectedEngine ? "__DEFAULT_ENGINE__" : raw?.url ?? fallback.url ?? "";
-    const rawMalMode = raw?.malApiMode || fallback.malApiMode || "none";
-    const rawImdbMode = raw?.imdbApiMode || fallback.imdbApiMode || "none";
-    return {
-        id: raw?.id || fallback.id || makeId("menu"),
-        name: (raw?.name || fallback.name || "Quick Search Item").trim(),
-        url: url === "__DEFAULT_ENGINE__" ? "__DEFAULT_ENGINE__" : ensureQueryPlaceholder(url),
-        queryMode: normalizeQueryMode(raw?.queryMode, fallback.queryMode || "titleYear"),
-        builtIn: Boolean(raw?.builtIn ?? fallback.builtIn),
-        usesSelectedEngine: url === "__DEFAULT_ENGINE__" || Boolean(raw?.usesSelectedEngine ?? fallback.usesSelectedEngine),
-        iconUrl: raw?.iconUrl || "",
-        malApiMode: ["none", "split", "always"].includes(rawMalMode) ? rawMalMode : "none",
-        imdbApiMode: ["none", "split", "always"].includes(rawImdbMode) ? rawImdbMode : "none"
-    };
-}
-
-function normalizeCustomEngine(raw) {
-    return {
-        id: raw?.id || makeId("custom"),
-        name: (raw?.name || "Custom Search").trim(),
-        url: ensureQueryPlaceholder(raw?.url || ""),
-        queryMode: normalizeQueryMode(raw?.queryMode, "titleYear"),
-        iconUrl: raw?.iconUrl || "",
-        malApiMode: ["none", "split", "always"].includes(raw?.malApiMode) ? raw.malApiMode : "none",
-        imdbApiMode: ["none", "split", "always"].includes(raw?.imdbApiMode) ? raw.imdbApiMode : "none"
-    };
-}
-function normalizeSettings(raw) {
-    const next = createDefaultState();
-    const rawSearchEngines = Array.isArray(raw.searchEngines) && raw.searchEngines.length > 0
-        ? raw.searchEngines
-        : DEFAULT_SEARCH_ENGINES;
-
-    next.searchEngines = rawSearchEngines.map((item, index) =>
-        normalizeSearchEngine(item, DEFAULT_SEARCH_ENGINES[index] || DEFAULT_SEARCH_ENGINES[0])
-    );
-
-    if (!Array.isArray(raw.searchEngines) && raw.searchEngine === "custom" && raw.customSearchUrl) {
-        const migratedId = "custom_migrated_default";
-        next.searchEngines.push({
-            id: migratedId,
-            name: "Migrated Custom URL",
-            url: ensureQueryPlaceholder(raw.customSearchUrl),
-            builtIn: false
-        });
-        next.searchEngineId = migratedId;
-    } else {
-        const fallbackId = raw.searchEngineId || raw.searchEngine || DEFAULT_SETTINGS.searchEngineId;
-        next.searchEngineId = next.searchEngines.some((engine) => engine.id === fallbackId)
-            ? fallbackId
-            : next.searchEngines[0]?.id || DEFAULT_SETTINGS.searchEngineId;
-    }
-
-    // --- Profile handling ---
-    if (raw.profiles && typeof raw.profiles === "object") {
-        next.activeProfileId = DEFAULT_PROFILE_IDS.includes(raw.activeProfileId)
-            ? raw.activeProfileId
-            : "imdb";
-        DEFAULT_PROFILES_CONFIG.forEach((def) => {
-            const existing = raw.profiles[def.id];
-            if (existing) {
-                let migratedItems;
-                if (Array.isArray(existing.menuItems) && existing.menuItems.length > 0) {
-                    migratedItems = existing.menuItems.map((item, index) => normalizeMenuItem(item, def.menuItems[index] || def.menuItems[0]));
-                    if (def.id.startsWith("mal-")) {
-                        migratedItems = migratedItems.filter(i => i.id !== "menu_mal");
-                        if (!migratedItems.some(i => i.id === "menu_imdb")) {
-                            migratedItems.unshift({
-                                id: "menu_imdb",
-                                name: "Search IMDb",
-                                url: "https://www.imdb.com/find/?q={query}",
-                                queryMode: "titleYear",
-                                builtIn: true,
-                                imdbApiMode: "none",
-                                usesSelectedEngine: false,
-                                iconUrl: ""
-                            });
-                        }
-                    }
-                } else {
-                    migratedItems = def.menuItems.map(i => ({ ...i }));
-                }
-                next.profiles[def.id] = {
-                    id: def.id,
-                    name: existing.name || def.name,
-                    site: SITE_OPTIONS.some(s => s.value === existing.site) ? existing.site : (def.site || "\u2014"),
-                    suffix: typeof existing.suffix === "string" ? existing.suffix : def.suffix,
-                    searchQueryMode: normalizeQueryMode(existing.searchQueryMode, def.searchQueryMode),
-                    menuItems: migratedItems,
-                    customEngines: Array.isArray(existing.customEngines)
-                        ? existing.customEngines.map(normalizeCustomEngine)
-                        : []
-                };
-            }
-        });
-        Object.keys(raw.profiles).forEach((id) => {
-            if (!DEFAULT_PROFILE_IDS.includes(id) && raw.profiles[id]) {
-                const rp = raw.profiles[id];
-                next.profiles[id] = {
-                    id,
-                    name: rp.name || id,
-                    site: SITE_OPTIONS.some(s => s.value === rp.site) ? rp.site : "\u2014",
-                    suffix: typeof rp.suffix === "string" ? rp.suffix : DEFAULT_SETTINGS.suffix,
-                    searchQueryMode: normalizeQueryMode(rp.searchQueryMode, DEFAULT_SETTINGS.searchQueryMode),
-                    menuItems: Array.isArray(rp.menuItems)
-                        ? rp.menuItems.map((item, index) => normalizeMenuItem(item, DEFAULT_MENU_ITEMS[0]))
-                        : [],
-                    customEngines: Array.isArray(rp.customEngines)
-                        ? rp.customEngines.map(normalizeCustomEngine)
-                        : []
-                };
-            }
-        });
-    } else {
-        // Migration from flat format
-        const rawMenuItems = Array.isArray(raw.menuItems) && raw.menuItems.length > 0
-            ? raw.menuItems
-            : DEFAULT_MENU_ITEMS;
-        const rawCustomEngines = Array.isArray(raw.customEngines) ? raw.customEngines : [];
-        const migratedMenuItems = rawMenuItems.map((item, index) =>
-            normalizeMenuItem(item, DEFAULT_MENU_ITEMS[index] || DEFAULT_MENU_ITEMS[0])
-        );
-        const migratedCustomEngines = rawCustomEngines.map(normalizeCustomEngine);
-
-        next.profiles["imdb"].suffix = typeof raw.suffix === "string" ? raw.suffix : DEFAULT_SETTINGS.suffix;
-        next.profiles["imdb"].searchQueryMode = normalizeQueryMode(raw.searchQueryMode, DEFAULT_SETTINGS.searchQueryMode);
-        next.profiles["imdb"].menuItems = migratedMenuItems;
-        next.profiles["imdb"].customEngines = migratedCustomEngines;
-        next.activeProfileId = "imdb";
-    }
-
-    if (typeof raw.emptyProfilesByDefault === "boolean") {
-        next.emptyProfilesByDefault = raw.emptyProfilesByDefault;
-    }
-    if (typeof raw.collapseDefaultEngines === "boolean") {
-        next.collapseDefaultEngines = raw.collapseDefaultEngines;
-    }
-    if (typeof raw.collapseQuickSearchMenu === "boolean") {
-        next.collapseQuickSearchMenu = raw.collapseQuickSearchMenu;
-    }
-    if (typeof raw.imdbEnabled === "boolean") next.imdbEnabled = raw.imdbEnabled;
-    if (typeof raw.malEnabled === "boolean") next.malEnabled = raw.malEnabled;
-    if (typeof raw.contextMenuEnabled === "boolean") next.contextMenuEnabled = raw.contextMenuEnabled;
-    if (raw.imdbButtonLabel === "search" || raw.imdbButtonLabel === "reresearch") next.imdbButtonLabel = raw.imdbButtonLabel;
-    if (raw.malButtonLabel === "search" || raw.malButtonLabel === "reresearch") next.malButtonLabel = raw.malButtonLabel;
-    if (typeof raw.malQuickLink === "boolean") next.malQuickLink = raw.malQuickLink;
-    if (raw.searchTitleMode === "original" || raw.searchTitleMode === "english") next.searchTitleMode = raw.searchTitleMode;
-
-    const active = next.profiles[next.activeProfileId];
-    if (active) {
-        next.suffix = active.suffix;
-        next.searchQueryMode = active.searchQueryMode;
-        next.menuItems = active.menuItems;
-        next.customEngines = active.customEngines;
-    }
-
-    return next;
-}
-
-function serializeSettings() {
-    const profile = getActiveProfile();
-    if (profile) {
-        profile.suffix = state.suffix;
-        profile.searchQueryMode = state.searchQueryMode;
-        profile.menuItems = state.menuItems;
-        profile.customEngines = state.customEngines;
-    }
-
-    const serializedProfiles = {};
-    Object.keys(state.profiles).forEach((id) => {
-        const p = state.profiles[id];
-        serializedProfiles[id] = {
-            id: p.id,
-            name: p.name,
-            site: p.site || "\u2014",
-            suffix: p.suffix,
-            searchQueryMode: p.searchQueryMode,
-                menuItems: p.menuItems.map((item) => ({
-                    id: item.id,
-                    name: item.name.trim(),
-                    url: item.usesSelectedEngine ? "__DEFAULT_ENGINE__" : ensureQueryPlaceholder(item.url),
-                    queryMode: normalizeQueryMode(item.queryMode),
-                    builtIn: Boolean(item.builtIn),
-                    usesSelectedEngine: Boolean(item.usesSelectedEngine),
-                    iconUrl: item.iconUrl || "",
-                    malApiMode: item.malApiMode || "none",
-                    imdbApiMode: item.imdbApiMode || "none"
-                })),
-                customEngines: p.customEngines.map((item) => ({
-                    id: item.id,
-                    name: item.name.trim(),
-                    url: ensureQueryPlaceholder(item.url),
-                    queryMode: normalizeQueryMode(item.queryMode),
-                    iconUrl: item.iconUrl || "",
-                    malApiMode: item.malApiMode || "none",
-                    imdbApiMode: item.imdbApiMode || "none"
-                }))
-        };
-    });
-
-    return {
-        searchEngineId: state.searchEngineId,
-        searchEngine: state.searchEngineId,
-        searchEngines: state.searchEngines.map((item) => ({
-            id: item.id,
-            name: item.name.trim(),
-            url: ensureQueryPlaceholder(item.url),
-            builtIn: Boolean(item.builtIn)
-        })),
-        activeProfileId: state.activeProfileId,
-        profiles: serializedProfiles,
-        // flat legacy fields for backward compat
-        suffix: state.suffix,
-        searchQueryMode: state.searchQueryMode,
-        menuItems: state.menuItems.map((item) => ({
-            id: item.id,
-            name: item.name.trim(),
-            url: item.usesSelectedEngine ? "__DEFAULT_ENGINE__" : ensureQueryPlaceholder(item.url),
-            queryMode: normalizeQueryMode(item.queryMode),
-            builtIn: Boolean(item.builtIn),
-            usesSelectedEngine: Boolean(item.usesSelectedEngine),
-            iconUrl: item.iconUrl || "",
-            malApiMode: item.malApiMode || "none",
-            imdbApiMode: item.imdbApiMode || "none"
-        })),
-        customEngines: state.customEngines.map((item) => ({
-            id: item.id,
-            name: item.name.trim(),
-            url: ensureQueryPlaceholder(item.url),
-            queryMode: normalizeQueryMode(item.queryMode),
-            iconUrl: item.iconUrl || "",
-            malApiMode: item.malApiMode || "none",
-            imdbApiMode: item.imdbApiMode || "none"
-        })),
-        customSearchUrl: "",
-        emptyProfilesByDefault: state.emptyProfilesByDefault,
-        collapseDefaultEngines: state.collapseDefaultEngines,
-        collapseQuickSearchMenu: state.collapseQuickSearchMenu,
-        imdbEnabled: state.imdbEnabled,
-        malEnabled: state.malEnabled,
-        contextMenuEnabled: state.contextMenuEnabled,
-        imdbButtonLabel: state.imdbButtonLabel,
-        malButtonLabel: state.malButtonLabel,
-        malQuickLink: state.malQuickLink,
-        searchTitleMode: state.searchTitleMode
-    };
-}
-
-function moveItem(items, index, direction) {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= items.length) {
-        return items;
-    }
-    const nextItems = [...items];
-    [nextItems[index], nextItems[nextIndex]] = [nextItems[nextIndex], nextItems[index]];
-    return nextItems;
-}
-
-function getSearchEngineById(id) {
-    return state.searchEngines.find((item) => item.id === id) || state.searchEngines[0];
-}
-
-function getActiveProfile() {
-    return state.profiles[state.activeProfileId] || state.profiles["imdb"] || state.profiles[Object.keys(state.profiles)[0]];
-}
-
-function saveCurrentProfileToState() {
-    const profile = getActiveProfile();
-    if (!profile) return;
-    profile.suffix = state.suffix;
-    profile.searchQueryMode = state.searchQueryMode;
-    profile.menuItems = state.menuItems;
-    profile.customEngines = state.customEngines;
-}
-
-function loadProfileIntoState(profile) {
-    if (!profile) return;
-    state.suffix = profile.suffix;
-    state.searchQueryMode = profile.searchQueryMode;
-    state.menuItems = profile.menuItems;
-    state.customEngines = profile.customEngines;
-}
-
-function createFallbackIcon(label) {
-    const fallback = document.createElement("div");
-    fallback.className = "engine-icon-fallback";
-    fallback.textContent = (label || "?").trim().charAt(0) || "?";
-    return fallback;
-}
-
-function createFaviconElement(url, label) {
-    const iconUrl = getFaviconUrl(url);
-    if (!iconUrl) {
-        return createFallbackIcon(label);
-    }
-
-    const img = document.createElement("img");
-    img.className = "engine-icon";
-    img.src = iconUrl;
-    img.alt = `${label} favicon`;
-    img.referrerPolicy = "no-referrer";
-    img.onerror = () => img.replaceWith(createFallbackIcon(label));
-    return img;
-}
-
-document.addEventListener("DOMContentLoaded", async () => {
-    const suffixInput = document.getElementById("suffix");
-    const engineSelect = document.getElementById("searchEngine");
-    const searchQueryModeSelect = document.getElementById("searchQueryMode");
-    const searchTitleModeSelect = document.getElementById("searchTitleModeMAL");
-    const searchPreview = document.getElementById("searchPreview");
-    const saveBtn = document.getElementById("saveBtn");
-    const resetBtn = document.getElementById("resetBtn");
-    const exportTriggerBtn = document.getElementById("exportTriggerBtn");
-    const exportDropdown = document.getElementById("exportDropdown");
-    const importFileInput = document.getElementById("importFileInput");
-    const status = document.getElementById("status");
+    let state = null;
+    let isDirty = false;
 
     const defaultEngineNameInput = document.getElementById("defaultEngineName");
     const defaultEngineUrlInput = document.getElementById("defaultEngineUrl");
     const addDefaultEngineBtn = document.getElementById("addDefaultEngineBtn");
     const defaultBuilderPreview = document.getElementById("defaultBuilderPreview");
     const defaultEnginesList = document.getElementById("defaultEnginesList");
-
     const pickFromMenuBtn = document.getElementById("pickFromMenuBtn");
     const menuPickerModal = document.getElementById("menuPickerModal");
     const pickerList = document.getElementById("pickerList");
     const pickerCloseBtn = document.getElementById("pickerCloseBtn");
-
     const menuItemsList = document.getElementById("menuItemsList");
-
     const customEngineNameInput = document.getElementById("customEngineName");
     const customEngineUrlInput = document.getElementById("customEngineUrl");
     const customEngineQueryModeSelect = document.getElementById("customEngineQueryMode");
@@ -612,7 +28,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const menuItemsSection = document.getElementById("menuItemsSection");
     const menuItemsHeader = document.getElementById("menuItemsHeader");
     const menuItemsBody = document.getElementById("menuItemsBody");
-
     const profileSelect = document.getElementById("profileSelect");
     const addProfileBtn = document.getElementById("addProfileBtn");
     const editProfileBtn = document.getElementById("editProfileBtn");
@@ -620,15 +35,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     const profileSectionIndicator = document.getElementById("profileSectionIndicator");
     const menuProfileIndicator = document.getElementById("menuProfileIndicator");
     const profileSiteSelect = document.getElementById("profileSiteSelect");
+    const suffixInput = document.getElementById("suffix");
+    const engineSelect = document.getElementById("searchEngine");
+    const searchQueryModeSelect = document.getElementById("searchQueryMode");
+    const searchTitleModeSelect = document.getElementById("searchTitleModeMAL");
+    const searchPreview = document.getElementById("searchPreview");
+    const saveBtn = document.getElementById("saveBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const exportTriggerBtn = document.getElementById("exportTriggerBtn");
+    const exportDropdown = document.getElementById("exportDropdown");
+    const importFileInput = document.getElementById("importFileInput");
+    const status = document.getElementById("status");
+    const syncToggle = document.getElementById("syncEnabledToggle");
+    const syncStatus = document.getElementById("syncStatus");
+
+    function init() {
+        S.initState(state);
+        state = S.state;
+    }
 
     function animateToggle(section, body) {
         if (section.classList.contains("collapsed")) {
             body.style.maxHeight = body.scrollHeight + "px";
             section.classList.remove("collapsed");
-            const onEnd = () => {
-                body.style.maxHeight = "";
-                body.removeEventListener("transitionend", onEnd);
-            };
+            const onEnd = () => { body.style.maxHeight = ""; body.removeEventListener("transitionend", onEnd); };
             body.addEventListener("transitionend", onEnd, { once: true });
         } else {
             body.style.maxHeight = body.scrollHeight + "px";
@@ -647,9 +77,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     function showStatus(message, type) {
         status.textContent = message;
         status.className = `status ${type}`;
-        setTimeout(() => {
-            status.className = "status";
-        }, 5000);
+        setTimeout(() => { status.className = "status"; }, 5000);
     }
 
     function showSuggestion(message, onAccept) {
@@ -661,19 +89,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         acceptBtn.textContent = 'Enable';
         acceptBtn.className = 'mini-btn';
         acceptBtn.style.cssText = 'margin-left:12px;background:#f5c518;color:#000;border:none;font-weight:700;';
-        acceptBtn.onclick = (e) => {
-            e.stopPropagation();
-            if (onAccept) onAccept();
-            status.className = 'status';
-        };
+        acceptBtn.onclick = (e) => { e.stopPropagation(); if (onAccept) onAccept(); status.className = 'status'; };
         const dismissBtn = document.createElement('button');
         dismissBtn.textContent = 'Dismiss';
         dismissBtn.className = 'mini-btn';
         dismissBtn.style.cssText = 'margin-left:6px;';
-        dismissBtn.onclick = (e) => {
-            e.stopPropagation();
-            status.className = 'status';
-        };
+        dismissBtn.onclick = (e) => { e.stopPropagation(); status.className = 'status'; };
         status.appendChild(textSpan);
         status.appendChild(acceptBtn);
         status.appendChild(dismissBtn);
@@ -687,39 +108,34 @@ document.addEventListener("DOMContentLoaded", async () => {
             option.textContent = engine.name;
             engineSelect.appendChild(option);
         });
-
         if (!state.searchEngines.some((engine) => engine.id === state.searchEngineId)) {
-            state.searchEngineId = state.searchEngines[0]?.id || DEFAULT_SETTINGS.searchEngineId;
+            state.searchEngineId = state.searchEngines[0]?.id || S.DEFAULT_SETTINGS.searchEngineId;
         }
-
         engineSelect.value = state.searchEngineId;
     }
 
     function updateSearchPreview() {
-        const selectedEngine = getSearchEngineById(state.searchEngineId);
+        const selectedEngine = S.getSearchEngineById(state.searchEngineId);
         const previewUrl = selectedEngine
-            ? buildSearchUrl(selectedEngine.url, state.searchQueryMode, state.suffix)
+            ? S.buildSearchUrl(selectedEngine.url, state.searchQueryMode, state.suffix)
             : "";
         searchPreview.textContent = previewUrl ? `Example: ${previewUrl}` : "Example URL will appear here.";
     }
 
     function updateBuilderPreview() {
-        defaultBuilderPreview.textContent = `Example: ${buildSearchUrl(defaultEngineUrlInput.value || "https://example.com/search?q=", "titleYear", "")}`;
-
-        customBuilderPreview.textContent = `Example: ${buildSearchUrl(customEngineUrlInput.value || "https://example.com/search?q=", customEngineQueryModeSelect.value, "")}`;
+        defaultBuilderPreview.textContent = `Example: ${S.buildSearchUrl(defaultEngineUrlInput.value || "https://example.com/search?q=", "titleYear", "")}`;
+        customBuilderPreview.textContent = `Example: ${S.buildSearchUrl(customEngineUrlInput.value || "https://example.com/search?q=", customEngineQueryModeSelect.value, "")}`;
     }
+
     function updateTitleBlock(container, item, subtitleText) {
         const titleText = document.createElement("div");
         titleText.className = "engine-title-text";
-
         const name = document.createElement("div");
         name.className = "engine-title-name";
         name.textContent = item.name || "Unnamed item";
-
         const subtitle = document.createElement("div");
         subtitle.className = "engine-title-url";
         subtitle.textContent = subtitleText;
-
         titleText.appendChild(name);
         titleText.appendChild(subtitle);
         container.appendChild(titleText);
@@ -729,19 +145,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         const select = document.createElement("select");
         if (allowConfigured) {
             const opt = document.createElement('option');
-            opt.value = 'configured';
-            opt.textContent = 'configured default';
+            opt.value = 'configured'; opt.textContent = 'configured default';
             select.appendChild(opt);
         }
         const opt1 = document.createElement('option');
-        opt1.value = 'title';
-        opt1.textContent = 'title';
+        opt1.value = 'title'; opt1.textContent = 'title';
         select.appendChild(opt1);
         const opt2 = document.createElement('option');
-        opt2.value = 'titleYear';
-        opt2.textContent = 'title+year';
+        opt2.value = 'titleYear'; opt2.textContent = 'title+year';
         select.appendChild(opt2);
-        select.value = normalizeQueryMode(value, allowConfigured ? "configured" : "titleYear");
+        select.value = S.normalizeQueryMode(value, allowConfigured ? "configured" : "titleYear");
         return select;
     }
 
@@ -749,30 +162,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         const list = state[collectionName];
         const actions = document.createElement("div");
         actions.className = "engine-actions";
-
         const upBtn = document.createElement("button");
         upBtn.type = "button";
         upBtn.className = "mini-btn";
         upBtn.textContent = "Up";
         upBtn.disabled = index === 0;
-        upBtn.onclick = () => {
-            state[collectionName] = moveItem(list, index, -1);
-            render();
-        };
-
+        upBtn.onclick = () => { state[collectionName] = S.moveItem(list, index, -1); render(); };
         const downBtn = document.createElement("button");
         downBtn.type = "button";
         downBtn.className = "mini-btn";
         downBtn.textContent = "Down";
         downBtn.disabled = index === list.length - 1;
-        downBtn.onclick = () => {
-            state[collectionName] = moveItem(list, index, 1);
-            render();
-        };
-
+        downBtn.onclick = () => { state[collectionName] = S.moveItem(list, index, 1); render(); };
         actions.appendChild(upBtn);
         actions.appendChild(downBtn);
-
         if (allowDelete) {
             const deleteBtn = document.createElement("button");
             deleteBtn.type = "button";
@@ -791,8 +194,40 @@ document.addEventListener("DOMContentLoaded", async () => {
             };
             actions.appendChild(deleteBtn);
         }
-
         return actions;
+    }
+
+    function createClickableIcon(item) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.title = "Click to change icon";
+        btn.style.cssText = "background:none;border:none;cursor:pointer;padding:0;border-radius:6px;display:flex;transition:opacity 0.15s;flex-shrink:0;";
+        btn.onmouseenter = () => { btn.style.opacity = "0.7"; };
+        btn.onmouseleave = () => { btn.style.opacity = "1"; };
+        if (item.iconUrl) {
+            const img = document.createElement("img");
+            img.className = "engine-icon";
+            img.src = item.iconUrl;
+            img.alt = `${item.name} icon`;
+            img.referrerPolicy = "no-referrer";
+            img.onerror = function () { this.replaceWith(S.createFallbackIcon(item.name)); };
+            btn.appendChild(img);
+        } else {
+            const url = item.usesSelectedEngine
+                ? (S.getSearchEngineById(state.searchEngineId)?.url || item.url)
+                : item.url;
+            btn.appendChild(S.createFaviconElement(url, item.name));
+        }
+        btn.onclick = (e) => { e.stopPropagation(); openIconPicker(item); };
+        return btn;
+    }
+
+    function createDragHandle() {
+        const handle = document.createElement("span");
+        handle.className = "drag-handle";
+        handle.textContent = "\u22EE\u22EE";
+        handle.title = "Drag to reorder";
+        return handle;
     }
 
     function createSearchEngineCard(engine, index) {
@@ -817,7 +252,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         header.appendChild(title);
         header.appendChild(createCardActions("searchEngines", index, engine, true));
-
         const fields = document.createElement("div");
         fields.className = "engine-fields";
         const nameWrap = document.createElement("div");
@@ -827,7 +261,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         nameInput.value = engine.name;
         nameInput.addEventListener("input", () => { engine.name = nameInput.value; isDirty = true; updateSaveButtonState(); });
         nameWrap.appendChild(nameInput);
-
         const urlWrap = document.createElement("div");
         urlWrap.className = "full-width";
         urlWrap.innerHTML = `<label>Search URL</label>`;
@@ -842,43 +275,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         urlWrap.appendChild(help);
         fields.appendChild(nameWrap);
         fields.appendChild(urlWrap);
-
         card.appendChild(header);
         card.appendChild(fields);
         return card;
-    }
-
-    function createClickableIcon(item) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.title = "Click to change icon";
-        btn.style.cssText = "background:none;border:none;cursor:pointer;padding:0;border-radius:6px;display:flex;transition:opacity 0.15s;flex-shrink:0;";
-        btn.onmouseenter = () => { btn.style.opacity = "0.7"; };
-        btn.onmouseleave = () => { btn.style.opacity = "1"; };
-        if (item.iconUrl) {
-            const img = document.createElement("img");
-            img.className = "engine-icon";
-            img.src = item.iconUrl;
-            img.alt = `${item.name} icon`;
-            img.referrerPolicy = "no-referrer";
-            img.onerror = function () { this.replaceWith(createFallbackIcon(item.name)); };
-            btn.appendChild(img);
-        } else {
-            const url = item.usesSelectedEngine
-                ? (getSearchEngineById(state.searchEngineId)?.url || item.url)
-                : item.url;
-            btn.appendChild(createFaviconElement(url, item.name));
-        }
-        btn.onclick = (e) => { e.stopPropagation(); openIconPicker(item); };
-        return btn;
-    }
-
-    function createDragHandle() {
-        const handle = document.createElement("span");
-        handle.className = "drag-handle";
-        handle.textContent = "\u22EE\u22EE";
-        handle.title = "Drag to reorder";
-        return handle;
     }
 
     function createMenuItemCard(item, index) {
@@ -903,7 +302,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         header.appendChild(title);
         header.appendChild(createCardActions("menuItems", index, item, true));
-
         const fields = document.createElement("div");
         fields.className = "engine-fields";
         const nameWrap = document.createElement("div");
@@ -913,21 +311,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         nameInput.value = item.name;
         nameInput.addEventListener("input", () => { item.name = nameInput.value; isDirty = true; updateSaveButtonState(); });
         nameWrap.appendChild(nameInput);
-
         const queryWrap = document.createElement("div");
         queryWrap.innerHTML = `<label>Query Template</label>`;
         const querySelect = createQueryModeSelect(item.queryMode, item.usesSelectedEngine);
         querySelect.addEventListener("change", () => { item.queryMode = querySelect.value; isDirty = true; updateSaveButtonState(); });
         queryWrap.appendChild(querySelect);
-
         const urlWrap = document.createElement("div");
         urlWrap.className = "full-width";
         urlWrap.innerHTML = `<label>Search URL</label>`;
         const urlInput = document.createElement("input");
         urlInput.type = "text";
-        urlInput.value = item.usesSelectedEngine
-            ? (getSearchEngineById(state.searchEngineId)?.url || "")
-            : item.url;
+        urlInput.value = item.usesSelectedEngine ? (S.getSearchEngineById(state.searchEngineId)?.url || "") : item.url;
         urlInput.addEventListener("input", () => { item.url = urlInput.value; item.usesSelectedEngine = false; isDirty = true; updateSaveButtonState(); });
         const help = document.createElement("div");
         help.className = "help-text";
@@ -962,14 +356,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         fields.appendChild(urlWrap);
 
         function updateMalModeVisibility() {
-            const url = (item.url || "").toLowerCase();
-            const isMal = url.includes("myanimelist.net");
-            malModeWrap.style.display = isMal ? "" : "none";
+            malModeWrap.style.display = (item.url || "").toLowerCase().includes("myanimelist.net") ? "" : "none";
         }
         function updateImdbModeVisibility() {
-            const url = (item.url || "").toLowerCase();
-            const isImdb = url.includes("imdb.com");
-            imdbModeWrap.style.display = isImdb ? "" : "none";
+            imdbModeWrap.style.display = (item.url || "").toLowerCase().includes("imdb.com") ? "" : "none";
         }
         updateMalModeVisibility();
         updateImdbModeVisibility();
@@ -979,6 +369,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         card.appendChild(fields);
         return card;
     }
+
     function createCustomEngineCard(item, index) {
         const card = document.createElement("div");
         card.className = "engine-card";
@@ -995,7 +386,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateTitleBlock(title, item, item.url);
         header.appendChild(title);
         header.appendChild(createCardActions("customEngines", index, item, true));
-
         const fields = document.createElement("div");
         fields.className = "engine-fields";
         const nameWrap = document.createElement("div");
@@ -1005,13 +395,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         nameInput.value = item.name;
         nameInput.addEventListener("input", () => { item.name = nameInput.value; isDirty = true; updateSaveButtonState(); });
         nameWrap.appendChild(nameInput);
-
         const queryWrap = document.createElement("div");
         queryWrap.innerHTML = `<label>Query Template</label>`;
         const querySelect = createQueryModeSelect(item.queryMode, false);
         querySelect.addEventListener("change", () => { item.queryMode = querySelect.value; isDirty = true; updateSaveButtonState(); });
         queryWrap.appendChild(querySelect);
-
         const urlWrap = document.createElement("div");
         urlWrap.className = "full-width";
         urlWrap.innerHTML = `<label>Search URL</label>`;
@@ -1026,7 +414,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         urlWrap.appendChild(help);
         fields.appendChild(nameWrap);
         fields.appendChild(queryWrap);
-
         const malModeWrap = document.createElement("div");
         malModeWrap.style.cssText = 'display:none;';
         malModeWrap.innerHTML = `<label>MAL API mode</label>`;
@@ -1036,7 +423,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         malModeSelect.addEventListener("change", () => { item.malApiMode = malModeSelect.value; isDirty = true; updateSaveButtonState(); });
         malModeWrap.appendChild(malModeSelect);
         fields.appendChild(malModeWrap);
-
         const imdbModeWrap = document.createElement("div");
         imdbModeWrap.style.cssText = 'display:none;';
         imdbModeWrap.innerHTML = `<label>IMDb API mode</label>`;
@@ -1046,23 +432,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         imdbModeSelect.addEventListener("change", () => { item.imdbApiMode = imdbModeSelect.value; isDirty = true; updateSaveButtonState(); });
         imdbModeWrap.appendChild(imdbModeSelect);
         fields.appendChild(imdbModeWrap);
-
         function updateMalModeVisibility() {
-            const url = (item.url || "").toLowerCase();
-            const isMal = url.includes("myanimelist.net");
-            malModeWrap.style.display = isMal ? "" : "none";
+            malModeWrap.style.display = (item.url || "").toLowerCase().includes("myanimelist.net") ? "" : "none";
         }
         function updateImdbModeVisibility() {
-            const url = (item.url || "").toLowerCase();
-            const isImdb = url.includes("imdb.com");
-            imdbModeWrap.style.display = isImdb ? "" : "none";
+            imdbModeWrap.style.display = (item.url || "").toLowerCase().includes("imdb.com") ? "" : "none";
         }
         updateMalModeVisibility();
         updateImdbModeVisibility();
         urlInput.addEventListener("input", () => { updateMalModeVisibility(); updateImdbModeVisibility(); });
-
         fields.appendChild(urlWrap);
-
         card.appendChild(header);
         card.appendChild(fields);
         return card;
@@ -1085,7 +464,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (searchEngineDragInitialized) return;
         searchEngineDragInitialized = true;
         let srcCard = null;
-
         const onDragStart = (e) => {
             const handle = e.target.closest(".drag-handle");
             if (!handle) { e.preventDefault(); return; }
@@ -1095,7 +473,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             e.dataTransfer.effectAllowed = "move";
             e.dataTransfer.setData("text/plain", "");
         };
-
         const onDragOver = (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
@@ -1103,37 +480,27 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (!tgt || tgt === srcCard) return;
             tgt.classList.add("drag-over");
         };
-
         const onDragLeave = (e) => {
             const tgt = e.target.closest(".engine-card");
             if (!tgt) return;
             tgt.classList.remove("drag-over");
         };
-
         const onDrop = (e) => {
             e.preventDefault();
             const tgtCard = e.target.closest(".engine-card");
             if (!tgtCard || !srcCard || tgtCard === srcCard) return;
             tgtCard.classList.remove("drag-over");
-
             const srcIdx = parseInt(srcCard.dataset.index, 10);
             const tgtIdx = parseInt(tgtCard.dataset.index, 10);
-
             const [moved] = state.searchEngines.splice(srcIdx, 1);
             state.searchEngines.splice(tgtIdx, 0, moved);
-
             isDirty = true;
             render();
         };
-
         const onDragEnd = () => {
-            if (srcCard) {
-                srcCard.classList.remove("dragging");
-                srcCard = null;
-            }
+            if (srcCard) { srcCard.classList.remove("dragging"); srcCard = null; }
             container.querySelectorAll(".engine-card.drag-over").forEach(c => c.classList.remove("drag-over"));
         };
-
         container.addEventListener("dragstart", onDragStart);
         container.addEventListener("dragover", onDragOver);
         container.addEventListener("dragleave", onDragLeave);
@@ -1162,7 +529,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (dragDropInitialized) return;
         dragDropInitialized = true;
         let srcCard = null;
-
         const onDragStart = (e) => {
             const handle = e.target.closest(".drag-handle");
             if (!handle) { e.preventDefault(); return; }
@@ -1172,7 +538,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             e.dataTransfer.effectAllowed = "move";
             e.dataTransfer.setData("text/plain", "");
         };
-
         const onDragOver = (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
@@ -1180,28 +545,23 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (!tgt || tgt === srcCard) return;
             tgt.classList.add("drag-over");
         };
-
         const onDragLeave = (e) => {
             const tgt = e.target.closest(".engine-card");
             if (!tgt) return;
             tgt.classList.remove("drag-over");
         };
-
         const onDrop = (e) => {
             e.preventDefault();
             const tgtCard = e.target.closest(".engine-card");
             if (!tgtCard || !srcCard || tgtCard === srcCard) return;
             tgtCard.classList.remove("drag-over");
-
             const srcCol = srcCard.dataset.collection;
             const srcIdx = parseInt(srcCard.dataset.index, 10);
             const tgtCol = tgtCard.dataset.collection;
             const tgtIdx = parseInt(tgtCard.dataset.index, 10);
-
             const srcList = state[srcCol];
             const tgtList = state[tgtCol];
             if (!srcList || !tgtList) return;
-
             if (srcCol === tgtCol) {
                 const [moved] = srcList.splice(srcIdx, 1);
                 srcList.splice(tgtIdx, 0, moved);
@@ -1209,18 +569,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const [moved] = srcList.splice(srcIdx, 1);
                 tgtList.splice(tgtIdx, 0, moved);
             }
-
             isDirty = true;
             render();
         };
-
         const onDragEnd = () => {
-            container.querySelectorAll(".engine-card").forEach(c => {
-                c.classList.remove("dragging", "drag-over");
-            });
+            container.querySelectorAll(".engine-card").forEach(c => c.classList.remove("dragging", "drag-over"));
             srcCard = null;
         };
-
         container.addEventListener("dragstart", onDragStart);
         container.addEventListener("dragover", onDragOver);
         container.addEventListener("dragleave", onDragLeave);
@@ -1238,8 +593,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const ids = Object.keys(state.profiles);
         if (ids.length === 0) {
             const opt = document.createElement("option");
-            opt.value = "";
-            opt.textContent = "No profiles";
+            opt.value = ""; opt.textContent = "No profiles";
             profileSelect.appendChild(opt);
             return;
         }
@@ -1247,12 +601,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             const p = state.profiles[id];
             if (!p) return;
             const opt = document.createElement("option");
-            opt.value = id;
-            opt.textContent = p.name || id;
+            opt.value = id; opt.textContent = p.name || id;
             if (id === currentId) opt.selected = true;
             profileSelect.appendChild(opt);
         });
-        const profile = getActiveProfile();
+        const profile = S.getActiveProfile();
         const profileName = profile ? profile.name : "";
         profileSectionIndicator.textContent = `(Profile: ${profileName})`;
         menuProfileIndicator.textContent = `(Profile: ${profileName})`;
@@ -1269,12 +622,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function renderSiteSelect() {
-        const profile = getActiveProfile();
+        const profile = S.getActiveProfile();
         profileSiteSelect.innerHTML = "";
-        SITE_OPTIONS.forEach((opt) => {
+        S.SITE_OPTIONS.forEach((opt) => {
             const option = document.createElement("option");
-            option.value = opt.value;
-            option.textContent = opt.label;
+            option.value = opt.value; option.textContent = opt.label;
             if (profile && profile.site === opt.value) option.selected = true;
             profileSiteSelect.appendChild(option);
         });
@@ -1305,6 +657,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const setVal = (id, val) => { const e = cb(id); if (e) e.value = val; };
         setChecked("imdbEnabledToggle", state.imdbEnabled);
         setChecked("malEnabledToggle", state.malEnabled);
+        setChecked("grEnabledToggle", state.grEnabled);
         setChecked("contextMenuToggle", state.contextMenuEnabled);
         setChecked("malQuickLinkToggle", state.malQuickLink);
         setVal("imdbButtonLabelSelect", state.imdbButtonLabel);
@@ -1318,277 +671,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         const allItems = [...state.menuItems, ...state.customEngines, ...state.searchEngines];
         for (const item of allItems) {
-            const url = (item.url || "").toLowerCase();
-            if (url.includes("myanimelist.net")) return true;
+            if ((item.url || "").toLowerCase().includes("myanimelist.net")) return true;
         }
         return false;
     }
 
-    try {
-        state = normalizeSettings(await storageGet(null));
-        render();
-        isDirty = false;
-        updateSaveButtonState();
-        if (hasMalDetection() && !state.malQuickLink) {
-            setTimeout(() => {
-                showSuggestion(
-                    "MyAnimeList detected! Enable MAL Quick Link to get direct page links via Jikan API.",
-                    () => {
-                        state.malQuickLink = true;
-                        const toggle = document.getElementById('malQuickLinkToggle');
-                        if (toggle) toggle.checked = true;
-                        isDirty = true;
-                        updateSaveButtonState();
-                        showStatus('MAL Quick Link enabled! Save settings to apply.', 'success');
-                    }
-                );
-            }, 600);
-        }
-    } catch (error) {
-        console.error("Error loading settings:", error);
-        showStatus("Error loading settings", "error");
-        render();
-        isDirty = false;
-        updateSaveButtonState();
-    }
-
-    // Listen for sync-pulled changes from background
-    browser.storage.onChanged.addListener(async (changes, area) => {
-        if (area !== "local") return;
-        if (!changes._syncMeta) return;
-        const relevant = Object.keys(changes).some(k =>
-            k !== "_syncMeta"
-        );
-        if (!relevant) return;
-        if (isDirty) {
-            showStatus("Settings updated from another device — save or reload to see changes.", "warning");
-        } else {
-            state = normalizeSettings(await storageGet(null));
-            render();
-            isDirty = false;
-            updateSaveButtonState();
-            showStatus("Settings synced from another device", "success");
-        }
-    });
-
-    engineSelect.addEventListener("change", () => {
-        state.searchEngineId = engineSelect.value;
-        isDirty = true;
-        updateSaveButtonState();
-        render();
-    });
-
-    searchQueryModeSelect.addEventListener("change", () => {
-        state.searchQueryMode = searchQueryModeSelect.value;
-        isDirty = true;
-        updateSaveButtonState();
-        updateSearchPreview();
-    });
-
-    suffixInput.addEventListener("input", () => {
-        state.suffix = suffixInput.value;
-        isDirty = true;
-        updateSaveButtonState();
-        updateSearchPreview();
-    });
-
-    searchTitleModeSelect.addEventListener("change", () => {
-        state.searchTitleMode = searchTitleModeSelect.value;
-        isDirty = true;
-        updateSaveButtonState();
-    });
-
-    profileSelect.addEventListener("change", () => {
-        const newId = profileSelect.value;
-        if (!newId || newId === state.activeProfileId) return;
-        const oldProfile = getActiveProfile();
-        if (oldProfile) {
-            oldProfile.suffix = state.suffix;
-            oldProfile.searchQueryMode = state.searchQueryMode;
-            oldProfile.menuItems = state.menuItems;
-            oldProfile.customEngines = state.customEngines;
-        }
-        state.activeProfileId = newId;
-        const newProfile = getActiveProfile();
-        if (newProfile) {
-            state.suffix = newProfile.suffix;
-            state.searchQueryMode = newProfile.searchQueryMode;
-            state.menuItems = newProfile.menuItems;
-            state.customEngines = newProfile.customEngines;
-        }
-        render();
-    });
-
-    addProfileBtn.addEventListener("click", () => {
-        const name = prompt("Enter a name for the new profile:");
-        if (!name || !name.trim()) return;
-        const id = "profile_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
-        const newProfile = {
-            id,
-            name: name.trim(),
-            site: "\u2014",
-            suffix: DEFAULT_SETTINGS.suffix,
-            searchQueryMode: DEFAULT_SETTINGS.searchQueryMode,
-            menuItems: state.emptyProfilesByDefault ? [] : [{ id: "menu_search", name: "Search in new tab", url: "__DEFAULT_ENGINE__", queryMode: "titleYear", builtIn: true, usesSelectedEngine: true }],
-            customEngines: []
-        };
-        state.profiles[id] = newProfile;
-        state.activeProfileId = id;
-        loadProfileIntoState(newProfile);
-        render();
-        showStatus("Profile created", "success");
-    });
-
-    deleteProfileBtn.addEventListener("click", () => {
-        const ids = Object.keys(state.profiles);
-        if (ids.length <= 1) {
-            showStatus("Cannot delete the last profile", "error");
-            return;
-        }
-        const profile = getActiveProfile();
-        if (!profile) return;
-        if (!confirm(`Delete profile "${profile.name}"? This cannot be undone.`)) return;
-        delete state.profiles[state.activeProfileId];
-        const remainingIds = Object.keys(state.profiles);
-        state.activeProfileId = remainingIds[0];
-        loadProfileIntoState(state.profiles[remainingIds[0]]);
-        render();
-        showStatus("Profile deleted", "success");
-    });
-
-    editProfileBtn.addEventListener("click", () => {
-        const profile = getActiveProfile();
-        if (!profile) return;
-        const newName = prompt("Edit profile name:", profile.name);
-        if (newName && newName.trim()) {
-            profile.name = newName.trim();
-            render();
-            showStatus("Profile renamed", "success");
-        }
-    });
-
-    profileSiteSelect.addEventListener("change", () => {
-        const newSite = profileSiteSelect.value;
-        if (!newSite) return;
-        const profile = getActiveProfile();
-        if (!profile) return;
-
-        const conflicting = findProfileBySite(newSite);
-        if (conflicting) {
-            if (!confirm(`Site "${newSite}" is already assigned to profile "${conflicting.name}". Remove it from "${conflicting.name}" and assign to "${profile.name}"?`)) {
-                renderSiteSelect();
-                return;
-            }
-            conflicting.site = "\u2014";
-        }
-
-        profile.site = newSite;
-        isDirty = true;
-        updateSaveButtonState();
-    });
-
-    defaultEngineUrlInput.addEventListener("input", updateBuilderPreview);
-    customEngineUrlInput.addEventListener("input", updateBuilderPreview);
-    customEngineQueryModeSelect.addEventListener("change", updateBuilderPreview);
-
-    addDefaultEngineBtn.addEventListener("click", () => {
-        const name = defaultEngineNameInput.value.trim();
-        const url = defaultEngineUrlInput.value.trim();
-        if (!name || !url) {
-            showStatus("Please enter both name and URL", "error");
-            return;
-        }
-        if (!isValidHttpUrl(url)) {
-            showStatus("URL must start with http:// or https://", "error");
-            return;
-        }
-        state.searchEngines.push({ id: makeId("engine"), name, url: ensureQueryPlaceholder(url), builtIn: false });
-        defaultEngineNameInput.value = "";
-        defaultEngineUrlInput.value = "";
-        isDirty = true;
-        render();
-        updateSaveButtonState();
-        showStatus("Default search engine added to the draft list", "success");
-    });
-
-    addCustomEngineBtn.addEventListener("click", () => {
-        const name = customEngineNameInput.value.trim();
-        const url = customEngineUrlInput.value.trim();
-        const queryMode = customEngineQueryModeSelect.value;
-        if (!name || !url) {
-            showStatus("Please enter both name and URL", "error");
-            return;
-        }
-        if (!isValidHttpUrl(url)) {
-            showStatus("URL must start with http:// or https://", "error");
-            return;
-        }
-        state.customEngines.push({ id: makeId("custom"), name, url: ensureQueryPlaceholder(url), queryMode: normalizeQueryMode(queryMode), malApiMode: "none", imdbApiMode: "none" });
-        customEngineNameInput.value = "";
-        customEngineUrlInput.value = "";
-        customEngineQueryModeSelect.value = "titleYear";
-        isDirty = true;
-        render();
-        updateSaveButtonState();
-        showStatus("Search engine added to the draft list", "success");
-    });
-
-    scrollToAddBtn.addEventListener("click", () => {
-        document.getElementById("addForm").scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-
-    function populatePicker() {
-        pickerList.textContent = '';
-        const allItems = [...state.menuItems, ...state.customEngines];
-        if (allItems.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'empty-state';
-            empty.textContent = 'No menu items yet.';
-            pickerList.appendChild(empty);
-            return;
-        }
-        allItems.forEach((item) => {
-            const el = document.createElement("div");
-            el.className = "picker-item";
-            const url = item.usesSelectedEngine
-                ? (getSearchEngineById(state.searchEngineId)?.url || item.url)
-                : item.url;
-            el.appendChild(createFaviconElement(url, item.name));
-            const textWrap = document.createElement("div");
-            textWrap.style.minWidth = "0";
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'picker-item-name';
-            nameDiv.textContent = item.name;
-            textWrap.appendChild(nameDiv);
-            const urlDiv = document.createElement('div');
-            urlDiv.className = 'picker-item-url';
-            urlDiv.textContent = url;
-            textWrap.appendChild(urlDiv);
-            el.appendChild(textWrap);
-            el.addEventListener("click", () => {
-                defaultEngineNameInput.value = item.name;
-                defaultEngineUrlInput.value = url;
-                updateBuilderPreview();
-                menuPickerModal.classList.remove("show");
-            });
-            pickerList.appendChild(el);
-        });
-    }
-
-    pickFromMenuBtn.addEventListener("click", () => {
-        populatePicker();
-        menuPickerModal.classList.add("show");
-    });
-
-    pickerCloseBtn.addEventListener("click", () => {
-        menuPickerModal.classList.remove("show");
-    });
-
-    menuPickerModal.addEventListener("click", (e) => {
-        if (e.target === menuPickerModal) {
-            menuPickerModal.classList.remove("show");
-        }
-    });
+    // ── Icon Picker ─────────────────────────────────────────────
 
     let iconPickerTarget = null;
     const iconPickerModal = document.getElementById("iconPickerModal");
@@ -1603,7 +691,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function getItemDisplayUrl(item) {
         return item.usesSelectedEngine
-            ? (getSearchEngineById(state.searchEngineId)?.url || item.url)
+            ? (S.getSearchEngineById(state.searchEngineId)?.url || item.url)
             : item.url;
     }
 
@@ -1616,7 +704,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             noSuggestions.textContent = "No URL defined yet";
             return;
         }
-        const domains = extractDomainsFromUrl(url);
+        const domains = S.extractDomainsFromUrl(url);
         if (domains.length === 0) {
             noSuggestions.style.display = "block";
             return;
@@ -1641,10 +729,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 btn.appendChild(fallback);
             };
             btn.appendChild(img);
-            btn.onclick = () => {
-                setIconPreview(faviconUrl);
-                iconUrlInput.value = faviconUrl;
-            };
+            btn.onclick = () => { setIconPreview(faviconUrl); iconUrlInput.value = faviconUrl; };
             suggestedIcons.appendChild(btn);
         });
     }
@@ -1664,39 +749,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         iconPickerModal.classList.add("show");
     }
 
-    iconPickerCloseBtn.addEventListener("click", () => {
-        iconPickerModal.classList.remove("show");
-        iconPickerTarget = null;
-    });
-
-    iconPickerModal.addEventListener("click", (e) => {
-        if (e.target === iconPickerModal) {
-            iconPickerModal.classList.remove("show");
-            iconPickerTarget = null;
-        }
-    });
-
-    iconUrlInput.addEventListener("input", () => {
-        const val = iconUrlInput.value.trim();
-        if (val) {
-            setIconPreview(val);
-        } else {
-            setIconPreview("");
-        }
-    });
-
+    iconPickerCloseBtn.addEventListener("click", () => { iconPickerModal.classList.remove("show"); iconPickerTarget = null; });
+    iconPickerModal.addEventListener("click", (e) => { if (e.target === iconPickerModal) { iconPickerModal.classList.remove("show"); iconPickerTarget = null; } });
+    iconUrlInput.addEventListener("input", () => { const val = iconUrlInput.value.trim(); setIconPreview(val); });
     iconFileInput.addEventListener("change", () => {
         const file = iconFileInput.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (e) => {
-            const dataUrl = e.target.result;
-            iconUrlInput.value = dataUrl;
-            setIconPreview(dataUrl);
-        };
+        reader.onload = (e) => { const dataUrl = e.target.result; iconUrlInput.value = dataUrl; setIconPreview(dataUrl); };
         reader.readAsDataURL(file);
     });
-
     iconPickerApplyBtn.addEventListener("click", () => {
         if (!iconPickerTarget) return;
         iconPickerTarget.iconUrl = iconUrlInput.value.trim();
@@ -1705,7 +767,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         render();
         showStatus("Icon updated", "success");
     });
-
     iconPickerRemoveBtn.addEventListener("click", () => {
         if (!iconPickerTarget) return;
         iconPickerTarget.iconUrl = "";
@@ -1715,75 +776,49 @@ document.addEventListener("DOMContentLoaded", async () => {
         showStatus("Icon removed", "success");
     });
 
-    saveBtn.addEventListener("click", async () => {
-        state.suffix = suffixInput.value.trim();
-        state.searchEngineId = engineSelect.value;
-        state.searchQueryMode = searchQueryModeSelect.value;
-        state.searchTitleMode = searchTitleModeSelect.value;
+    // ── Menu Picker ────────────────────────────────────────────
 
-        const profile = getActiveProfile();
-        if (profile) {
-            profile.suffix = state.suffix;
-            profile.searchQueryMode = state.searchQueryMode;
-            profile.menuItems = state.menuItems;
-            profile.customEngines = state.customEngines;
+    function populatePicker() {
+        pickerList.textContent = '';
+        const allItems = [...state.menuItems, ...state.customEngines];
+        if (allItems.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = 'No menu items yet.';
+            pickerList.appendChild(empty);
+            return;
         }
-
-        const invalidDefault = state.searchEngines.find((item) => !item.name.trim() || !isValidHttpUrl(item.url));
-        const invalidMenuItem = state.menuItems.find((item) => {
-            if (!item.name.trim()) {
-                return true;
-            }
-            if (item.usesSelectedEngine) {
-                return false;
-            }
-            return !isValidHttpUrl(item.url);
+        allItems.forEach((item) => {
+            const el = document.createElement("div");
+            el.className = "picker-item";
+            const url = item.usesSelectedEngine ? (S.getSearchEngineById(state.searchEngineId)?.url || item.url) : item.url;
+            el.appendChild(S.createFaviconElement(url, item.name));
+            const textWrap = document.createElement("div");
+            textWrap.style.minWidth = "0";
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'picker-item-name';
+            nameDiv.textContent = item.name;
+            textWrap.appendChild(nameDiv);
+            const urlDiv = document.createElement('div');
+            urlDiv.className = 'picker-item-url';
+            urlDiv.textContent = url;
+            textWrap.appendChild(urlDiv);
+            el.appendChild(textWrap);
+            el.addEventListener("click", () => {
+                defaultEngineNameInput.value = item.name;
+                defaultEngineUrlInput.value = url;
+                updateBuilderPreview();
+                menuPickerModal.classList.remove("show");
+            });
+            pickerList.appendChild(el);
         });
-        const invalidCustom = state.customEngines.find((item) => !item.name.trim() || !isValidHttpUrl(item.url));
+    }
 
-        if (invalidDefault || invalidMenuItem || invalidCustom) {
-            showStatus("Every item needs a name and a valid URL", "error");
-            return;
-        }
-        if (state.searchEngines.length === 0) {
-            showStatus("At least one default search engine must remain", "error");
-            return;
-        }
+    pickFromMenuBtn.addEventListener("click", () => { populatePicker(); menuPickerModal.classList.add("show"); });
+    pickerCloseBtn.addEventListener("click", () => { menuPickerModal.classList.remove("show"); });
+    menuPickerModal.addEventListener("click", (e) => { if (e.target === menuPickerModal) menuPickerModal.classList.remove("show"); });
 
-        try {
-            await storageSet(serializeSettings());
-            showStatus("Settings saved successfully!", "success");
-            render();
-            isDirty = false;
-            updateSaveButtonState();
-        } catch (error) {
-            console.error("Error saving settings:", error);
-            showStatus("Error saving settings", "error");
-        }
-    });
-
-    resetBtn.addEventListener("click", async () => {
-        if (!confirm("Reset all settings to default values?")) {
-            return;
-        }
-
-        try {
-            state = createDefaultState();
-            await storageSet(serializeSettings());
-            defaultEngineNameInput.value = "";
-            defaultEngineUrlInput.value = "";
-            customEngineNameInput.value = "";
-            customEngineUrlInput.value = "";
-            customEngineQueryModeSelect.value = "titleYear";
-            render();
-            isDirty = false;
-            updateSaveButtonState();
-            showStatus("Settings reset to defaults", "success");
-        } catch (error) {
-            console.error("Error resetting settings:", error);
-            showStatus("Error resetting settings", "error");
-        }
-    });
+    // ── Import / Export ────────────────────────────────────────
 
     function downloadJson(data, filename) {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -1796,185 +831,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function exportSettings() {
-        const profile = getActiveProfile();
-        if (profile) {
-            saveCurrentProfileToState();
-        }
-        const data = serializeSettings();
-        const timestamp = new Date().toISOString().slice(0, 10);
-        downloadJson(data, `rere-settings-${timestamp}.json`);
+        const profile = S.getActiveProfile();
+        if (profile) S.saveCurrentProfileToState();
+        const data = S.serializeSettings();
+        downloadJson(data, `rere-settings-${new Date().toISOString().slice(0, 10)}.json`);
         showStatus("Settings exported", "success");
         closeExportDropdown();
     }
 
     function exportProfile() {
-        const profile = getActiveProfile();
+        const profile = S.getActiveProfile();
         if (!profile) return;
-        saveCurrentProfileToState();
-        const timestamp = new Date().toISOString().slice(0, 10);
+        S.saveCurrentProfileToState();
         const safeName = profile.name.replace(/[^a-zA-Z0-9_-]/g, "_");
-        downloadJson({ ...profile }, `rere-profile-${safeName}-${timestamp}.json`);
+        downloadJson({ ...profile }, `rere-profile-${safeName}-${new Date().toISOString().slice(0, 10)}.json`);
         showStatus(`Profile "${profile.name}" exported`, "success");
-        closeExportDropdown();
-    }
-
-    function isProfileDuplicate(profile) {
-        const normalized = {
-            site: SITE_OPTIONS.some(s => s.value === profile.site) ? profile.site : "\u2014",
-            suffix: typeof profile.suffix === "string" ? profile.suffix : state.suffix,
-            searchQueryMode: normalizeQueryMode(profile.searchQueryMode, state.searchQueryMode),
-            menuItems: Array.isArray(profile.menuItems)
-                ? profile.menuItems.map(m => normalizeMenuItem(m, DEFAULT_MENU_ITEMS[0]))
-                : null,
-            customEngines: Array.isArray(profile.customEngines)
-                ? profile.customEngines.map(normalizeCustomEngine)
-                : []
-        };
-        const needle = JSON.stringify(normalized);
-        return Object.values(state.profiles).some(p => {
-            const existing = {
-                site: p.site,
-                suffix: p.suffix,
-                searchQueryMode: p.searchQueryMode,
-                menuItems: p.menuItems,
-                customEngines: p.customEngines
-            };
-            return JSON.stringify(existing) === needle;
-        });
-    }
-
-    function addImportedProfile(profile) {
-        if (isProfileDuplicate(profile)) return null;
-
-        let newName = profile.name || "Imported";
-        const existingNames = Object.values(state.profiles).map(p => p.name);
-        if (existingNames.includes(newName)) {
-            let counter = 2;
-            while (existingNames.includes(newName + " (" + counter + ")")) {
-                counter++;
-            }
-            newName = newName + " (" + counter + ")";
-        }
-        const newId = makeId("imported");
-        state.profiles[newId] = {
-            id: newId,
-            name: newName,
-            site: SITE_OPTIONS.some(s => s.value === profile.site) ? profile.site : "\u2014",
-            suffix: typeof profile.suffix === "string" ? profile.suffix : state.suffix,
-            searchQueryMode: normalizeQueryMode(profile.searchQueryMode, state.searchQueryMode),
-            menuItems: Array.isArray(profile.menuItems)
-                ? profile.menuItems.map(m => normalizeMenuItem(m, DEFAULT_MENU_ITEMS[0]))
-                : state.menuItems.map(i => ({ ...i })),
-            customEngines: Array.isArray(profile.customEngines)
-                ? profile.customEngines.map(normalizeCustomEngine)
-                : []
-        };
-        return newId;
-    }
-
-    function importSettings(file) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                saveCurrentProfileToState();
-                let firstNewId = null;
-
-                // Merge search engines (add unique ones)
-                if (Array.isArray(data.searchEngines)) {
-                    for (const engine of data.searchEngines) {
-                        if (!state.searchEngines.some(e => e.id === engine.id)) {
-                            state.searchEngines.push(normalizeSearchEngine(engine, engine));
-                        }
-                    }
-                }
-
-                // Merge profiles (add as new, rename on clash)
-                if (data.profiles && typeof data.profiles === "object") {
-                    for (const [, profile] of Object.entries(data.profiles)) {
-                        const newId = addImportedProfile(profile);
-                        if (!firstNewId) firstNewId = newId;
-                    }
-                }
-
-                // Handle flat single-profile import
-                if (data.name && !data.profiles) {
-                    const newId = addImportedProfile(data);
-                    if (!firstNewId) firstNewId = newId;
-                }
-
-                if (firstNewId) {
-                    state.activeProfileId = firstNewId;
-                    loadProfileIntoState(state.profiles[firstNewId]);
-                }
-
-                await storageSet(serializeSettings());
-                render();
-                isDirty = false;
-                updateSaveButtonState();
-                showStatus("Settings imported successfully!", "success");
-            } catch (err) {
-                console.error("Import error:", err);
-                showStatus("Failed to import settings: invalid file", "error");
-            }
-        };
-        reader.readAsText(file);
         closeExportDropdown();
     }
 
     function encodeSettings(obj) {
         const bytes = new TextEncoder().encode(JSON.stringify(obj));
         let binary = "";
-        for (let i = 0; i < bytes.length; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         return "rere:import:" + btoa(binary);
     }
 
     function decodeSettings(str) {
         const prefix = "rere:import:";
         let encoded = str;
-        if (encoded.startsWith(prefix)) {
-            encoded = encoded.slice(prefix.length);
-        }
+        if (encoded.startsWith(prefix)) encoded = encoded.slice(prefix.length);
         encoded = encoded.trim();
         const binary = atob(encoded);
         const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
-        }
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         return JSON.parse(new TextDecoder().decode(bytes));
-    }
-
-    function importData(data) {
-        saveCurrentProfileToState();
-        let firstNewId = null;
-        let added = 0;
-        let skipped = 0;
-
-        if (Array.isArray(data.searchEngines)) {
-            for (const engine of data.searchEngines) {
-                if (!state.searchEngines.some(e => e.id === engine.id)) {
-                    state.searchEngines.push(normalizeSearchEngine(engine, engine));
-                }
-            }
-        }
-
-        if (data.profiles && typeof data.profiles === "object") {
-            for (const [, profile] of Object.entries(data.profiles)) {
-                const newId = addImportedProfile(profile);
-                if (newId) { added++; if (!firstNewId) firstNewId = newId; }
-                else skipped++;
-            }
-        }
-
-        if (data.name && !data.profiles) {
-            const newId = addImportedProfile(data);
-            if (newId) { added++; if (!firstNewId) firstNewId = newId; }
-            else skipped++;
-        }
-
-        return { firstNewId, added, skipped };
     }
 
     function importSettings(file) {
@@ -1982,12 +872,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         reader.onload = async (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                const { firstNewId, added, skipped } = importData(data);
-                if (firstNewId) {
-                    state.activeProfileId = firstNewId;
-                    loadProfileIntoState(state.profiles[firstNewId]);
-                }
-                await storageSet(serializeSettings());
+                S.saveCurrentProfileToState();
+                const { firstNewId, added, skipped } = S.importData(data);
+                if (firstNewId) { state.activeProfileId = firstNewId; S.loadProfileIntoState(state.profiles[firstNewId]); }
+                await storageSet(S.serializeSettings());
                 render();
                 isDirty = false;
                 updateSaveButtonState();
@@ -2007,12 +895,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     function importFromStr(str) {
         try {
             const data = decodeSettings(str);
-            const { firstNewId, added, skipped } = importData(data);
-            if (firstNewId) {
-                state.activeProfileId = firstNewId;
-                loadProfileIntoState(state.profiles[firstNewId]);
-            }
-            storageSet(serializeSettings()).then(() => {
+            S.saveCurrentProfileToState();
+            const { firstNewId, added, skipped } = S.importData(data);
+            if (firstNewId) { state.activeProfileId = firstNewId; S.loadProfileIntoState(state.profiles[firstNewId]); }
+            storageSet(S.serializeSettings()).then(() => {
                 render();
                 isDirty = false;
                 updateSaveButtonState();
@@ -2039,9 +925,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     document.addEventListener("click", (e) => {
-        if (!e.target.closest(".save-group")) {
-            closeExportDropdown();
-        }
+        if (!e.target.closest(".save-group")) closeExportDropdown();
     });
 
     exportDropdown.addEventListener("click", (e) => {
@@ -2052,40 +936,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         else if (action === "import") importFileInput.click();
         else if (action === "export-profile") exportProfile();
         else if (action === "copy-link") {
-            const profile = getActiveProfile();
-            if (profile) saveCurrentProfileToState();
-            const data = serializeSettings();
+            const profile = S.getActiveProfile();
+            if (profile) S.saveCurrentProfileToState();
+            const data = S.serializeSettings();
             const link = encodeSettings(data);
-            navigator.clipboard.writeText(link).then(() => {
-                showStatus("Import link copied to clipboard", "success");
-            }).catch(() => {
-                showStatus("Failed to copy to clipboard", "error");
-            });
+            navigator.clipboard.writeText(link).then(() => showStatus("Import link copied to clipboard", "success")).catch(() => showStatus("Failed to copy to clipboard", "error"));
             closeExportDropdown();
-        } else if (action === "paste-import") {
-            openPasteModal();
         } else if (action === "paste-clipboard") {
             navigator.clipboard.readText().then(text => {
                 const val = text.trim();
-                if (!val) {
-                    showStatus("Clipboard is empty", "error");
-                    return;
-                }
+                if (!val) { showStatus("Clipboard is empty", "error"); return; }
                 importFromStr(val);
-            }).catch(() => {
-                showStatus("Cannot read clipboard. Grant permission or paste via Ctrl+V.", "error");
-            });
+            }).catch(() => showStatus("Cannot read clipboard. Grant permission or paste via Ctrl+V.", "error"));
             closeExportDropdown();
         } else if (action === "copy-profile") {
-            saveCurrentProfileToState();
-            const profile = getActiveProfile();
+            S.saveCurrentProfileToState();
+            const profile = S.getActiveProfile();
             if (profile) {
                 const link = encodeSettings(profile);
-                navigator.clipboard.writeText(link).then(() => {
-                    showStatus('Profile "' + profile.name + '" link copied', "success");
-                }).catch(() => {
-                    showStatus("Failed to copy to clipboard", "error");
-                });
+                navigator.clipboard.writeText(link).then(() => showStatus('Profile "' + profile.name + '" link copied', "success")).catch(() => showStatus("Failed to copy to clipboard", "error"));
             }
             closeExportDropdown();
         }
@@ -2097,134 +966,315 @@ document.addEventListener("DOMContentLoaded", async () => {
         importFileInput.value = "";
     });
 
-    const emptyToggle = document.getElementById("emptyProfilesToggle");
-    if (emptyToggle) {
-        emptyToggle.addEventListener("change", () => {
-            state.emptyProfilesByDefault = emptyToggle.checked;
-            isDirty = true;
-            updateSaveButtonState();
-        });
-    }
+    // ── Init ───────────────────────────────────────────────────
 
-    const collapseDefaultToggle = document.getElementById("collapseDefaultToggle");
-    if (collapseDefaultToggle) {
-        collapseDefaultToggle.addEventListener("change", () => {
-            state.collapseDefaultEngines = collapseDefaultToggle.checked;
-            defaultEnginesSection.classList.toggle("collapsed", state.collapseDefaultEngines);
-            isDirty = true;
+    document.addEventListener("DOMContentLoaded", async () => {
+        try {
+            state = S.normalizeSettings(await storageGet(null));
+            init();
+            render();
+            isDirty = false;
             updateSaveButtonState();
-        });
-    }
-
-    const collapseQuickToggle = document.getElementById("collapseQuickToggle");
-    if (collapseQuickToggle) {
-        collapseQuickToggle.addEventListener("change", () => {
-            state.collapseQuickSearchMenu = collapseQuickToggle.checked;
-            menuItemsSection.classList.toggle("collapsed", state.collapseQuickSearchMenu);
-            isDirty = true;
+            if (hasMalDetection() && !state.malQuickLink) {
+                setTimeout(() => {
+                    showSuggestion("MyAnimeList detected! Enable MAL Quick Link to get direct page links via Jikan API.", () => {
+                        state.malQuickLink = true;
+                        const toggle = document.getElementById('malQuickLinkToggle');
+                        if (toggle) toggle.checked = true;
+                        isDirty = true;
+                        updateSaveButtonState();
+                        showStatus('MAL Quick Link enabled! Save settings to apply.', 'success');
+                    });
+                }, 600);
+            }
+        } catch (error) {
+            console.error("Error loading settings:", error);
+            state = S.createDefaultState();
+            init();
+            render();
+            isDirty = false;
             updateSaveButtonState();
-        });
-    }
+            showStatus("Error loading settings", "error");
+        }
 
-    const syncToggle = document.getElementById("syncEnabledToggle");
-    const syncStatus = document.getElementById("syncStatus");
-    if (syncToggle) {
-        storageGetSyncEnabled().then(enabled => {
-            syncToggle.checked = enabled;
-        });
-        syncToggle.addEventListener("change", async () => {
-            const enable = syncToggle.checked;
-            if (enable) {
-                const data = serializeSettings();
-                const currentSyncEnabled = await storageGetSyncEnabled();
-                if (!currentSyncEnabled) {
-                    syncStatus.textContent = "Migrating data to Firefox Sync\u2026";
-                    syncStatus.style.display = "block";
-                    try {
-                        await storageSet(data);
-                        await storageMigrateLocalToSync();
-                        await storageSetSyncEnabled(true);
-                        syncStatus.textContent = "Sync enabled. Your data will now sync across devices.";
-                        setTimeout(() => { syncStatus.style.display = "none"; }, 4000);
-                    } catch (err) {
-                        syncToggle.checked = false;
-                        syncStatus.textContent = "Sync error: " + err.message;
-                        syncStatus.style.display = "block";
-                    }
-                }
+        // Sync listener
+        browser.storage.onChanged.addListener(async (changes, area) => {
+            if (area !== "local") return;
+            if (!changes._syncMeta) return;
+            const relevant = Object.keys(changes).some(k => k !== "_syncMeta");
+            if (!relevant) return;
+            if (isDirty) {
+                showStatus("Settings updated from another device — save or reload to see changes.", "warning");
             } else {
-                syncStatus.textContent = "Migrating data to local storage\u2026";
-                syncStatus.style.display = "block";
-                try {
-                    await storageSet(serializeSettings());
-                    await storageMigrateSyncToLocal();
-                    await storageSetSyncEnabled(false);
-                    syncStatus.textContent = "Sync disabled. Data is now stored locally only.";
-                    setTimeout(() => { syncStatus.style.display = "none"; }, 4000);
-                } catch (err) {
-                    syncToggle.checked = true;
-                    syncStatus.textContent = "Migration error: " + err.message;
-                    syncStatus.style.display = "block";
-                }
+                state = S.normalizeSettings(await storageGet(null));
+                init();
+                render();
+                isDirty = false;
+                updateSaveButtonState();
+                showStatus("Settings synced from another device", "success");
             }
         });
-    }
 
-    function bindToggle(id, key) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener("change", () => { state[key] = el.checked; isDirty = true; updateSaveButtonState(); });
-    }
-    function bindSelect(id, key) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener("change", () => { state[key] = el.value; isDirty = true; updateSaveButtonState(); });
-    }
-    bindToggle("imdbEnabledToggle", "imdbEnabled");
-    bindToggle("malEnabledToggle", "malEnabled");
-    bindToggle("contextMenuToggle", "contextMenuEnabled");
-    bindToggle("malQuickLinkToggle", "malQuickLink");
-    bindSelect("imdbButtonLabelSelect", "imdbButtonLabel");
-    bindSelect("malButtonLabelSelect", "malButtonLabel");
-
-    // Tab switching
-    document.querySelectorAll(".tab-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-            btn.classList.add("active");
-            const panel = document.getElementById("tab" + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1));
-            if (panel) panel.classList.add("active");
+        // Event bindings
+        engineSelect.addEventListener("change", () => {
+            state.searchEngineId = engineSelect.value;
+            isDirty = true;
+            updateSaveButtonState();
+            render();
         });
-    });
+        searchQueryModeSelect.addEventListener("change", () => {
+            state.searchQueryMode = searchQueryModeSelect.value;
+            isDirty = true;
+            updateSaveButtonState();
+            updateSearchPreview();
+        });
+        suffixInput.addEventListener("input", () => {
+            state.suffix = suffixInput.value;
+            isDirty = true;
+            updateSaveButtonState();
+            updateSearchPreview();
+        });
+        searchTitleModeSelect.addEventListener("change", () => {
+            state.searchTitleMode = searchTitleModeSelect.value;
+            isDirty = true;
+            updateSaveButtonState();
+        });
+        profileSelect.addEventListener("change", () => {
+            const newId = profileSelect.value;
+            if (!newId || newId === state.activeProfileId) return;
+            const oldProfile = S.getActiveProfile();
+            if (oldProfile) {
+                oldProfile.suffix = state.suffix;
+                oldProfile.searchQueryMode = state.searchQueryMode;
+                oldProfile.menuItems = state.menuItems;
+                oldProfile.customEngines = state.customEngines;
+            }
+            state.activeProfileId = newId;
+            const newProfile = S.getActiveProfile();
+            if (newProfile) {
+                state.suffix = newProfile.suffix;
+                state.searchQueryMode = newProfile.searchQueryMode;
+                state.menuItems = newProfile.menuItems;
+                state.customEngines = newProfile.customEngines;
+            }
+            render();
+        });
+        addProfileBtn.addEventListener("click", () => {
+            const name = prompt("Enter a name for the new profile:");
+            if (!name || !name.trim()) return;
+            const id = "profile_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+            const newProfile = {
+                id, name: name.trim(), site: "\u2014",
+                suffix: S.DEFAULT_SETTINGS.suffix,
+                searchQueryMode: S.DEFAULT_SETTINGS.searchQueryMode,
+                menuItems: state.emptyProfilesByDefault ? [] : [{ id: "menu_search", name: "Search in new tab", url: "__DEFAULT_ENGINE__", queryMode: "titleYear", builtIn: true, usesSelectedEngine: true }],
+                customEngines: []
+            };
+            state.profiles[id] = newProfile;
+            state.activeProfileId = id;
+            S.loadProfileIntoState(newProfile);
+            render();
+            showStatus("Profile created", "success");
+        });
+        deleteProfileBtn.addEventListener("click", () => {
+            const ids = Object.keys(state.profiles);
+            if (ids.length <= 1) { showStatus("Cannot delete the last profile", "error"); return; }
+            const profile = S.getActiveProfile();
+            if (!profile) return;
+            if (!confirm(`Delete profile "${profile.name}"? This cannot be undone.`)) return;
+            delete state.profiles[state.activeProfileId];
+            const remainingIds = Object.keys(state.profiles);
+            state.activeProfileId = remainingIds[0];
+            S.loadProfileIntoState(state.profiles[remainingIds[0]]);
+            render();
+            showStatus("Profile deleted", "success");
+        });
+        editProfileBtn.addEventListener("click", () => {
+            const profile = S.getActiveProfile();
+            if (!profile) return;
+            const newName = prompt("Edit profile name:", profile.name);
+            if (newName && newName.trim()) { profile.name = newName.trim(); render(); showStatus("Profile renamed", "success"); }
+        });
+        profileSiteSelect.addEventListener("change", () => {
+            const newSite = profileSiteSelect.value;
+            if (!newSite) return;
+            const profile = S.getActiveProfile();
+            if (!profile) return;
+            const conflicting = findProfileBySite(newSite);
+            if (conflicting) {
+                if (!confirm(`Site "${newSite}" is already assigned to profile "${conflicting.name}". Remove it from "${conflicting.name}" and assign to "${profile.name}"?`)) {
+                    renderSiteSelect();
+                    return;
+                }
+                conflicting.site = "\u2014";
+            }
+            profile.site = newSite;
+            isDirty = true;
+            updateSaveButtonState();
+        });
+        defaultEngineUrlInput.addEventListener("input", updateBuilderPreview);
+        customEngineUrlInput.addEventListener("input", updateBuilderPreview);
+        customEngineQueryModeSelect.addEventListener("change", updateBuilderPreview);
+        addDefaultEngineBtn.addEventListener("click", () => {
+            const name = defaultEngineNameInput.value.trim();
+            const url = defaultEngineUrlInput.value.trim();
+            if (!name || !url) { showStatus("Please enter both name and URL", "error"); return; }
+            if (!S.isValidHttpUrl(url)) { showStatus("URL must start with http:// or https://", "error"); return; }
+            state.searchEngines.push({ id: S.makeId("engine"), name, url: S.ensureQueryPlaceholder(url), builtIn: false });
+            defaultEngineNameInput.value = "";
+            defaultEngineUrlInput.value = "";
+            isDirty = true;
+            render();
+            updateSaveButtonState();
+            showStatus("Default search engine added to the draft list", "success");
+        });
+        addCustomEngineBtn.addEventListener("click", () => {
+            const name = customEngineNameInput.value.trim();
+            const url = customEngineUrlInput.value.trim();
+            const queryMode = customEngineQueryModeSelect.value;
+            if (!name || !url) { showStatus("Please enter both name and URL", "error"); return; }
+            if (!S.isValidHttpUrl(url)) { showStatus("URL must start with http:// or https://", "error"); return; }
+            state.customEngines.push({ id: S.makeId("custom"), name, url: S.ensureQueryPlaceholder(url), queryMode: S.normalizeQueryMode(queryMode), malApiMode: "none", imdbApiMode: "none" });
+            customEngineNameInput.value = "";
+            customEngineUrlInput.value = "";
+            customEngineQueryModeSelect.value = "titleYear";
+            isDirty = true;
+            render();
+            updateSaveButtonState();
+            showStatus("Search engine added to the draft list", "success");
+        });
+        scrollToAddBtn.addEventListener("click", () => {
+            document.getElementById("addForm").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+        saveBtn.addEventListener("click", async () => {
+            state.suffix = suffixInput.value.trim();
+            state.searchEngineId = engineSelect.value;
+            state.searchQueryMode = searchQueryModeSelect.value;
+            state.searchTitleMode = searchTitleModeSelect.value;
+            const profile = S.getActiveProfile();
+            if (profile) {
+                profile.suffix = state.suffix;
+                profile.searchQueryMode = state.searchQueryMode;
+                profile.menuItems = state.menuItems;
+                profile.customEngines = state.customEngines;
+            }
+            const invalidDefault = state.searchEngines.find((item) => !item.name.trim() || !S.isValidHttpUrl(item.url));
+            const invalidMenuItem = state.menuItems.find((item) => { if (!item.name.trim()) return true; if (item.usesSelectedEngine) return false; return !S.isValidHttpUrl(item.url); });
+            const invalidCustom = state.customEngines.find((item) => !item.name.trim() || !S.isValidHttpUrl(item.url));
+            if (invalidDefault || invalidMenuItem || invalidCustom) { showStatus("Every item needs a name and a valid URL", "error"); return; }
+            if (state.searchEngines.length === 0) { showStatus("At least one default search engine must remain", "error"); return; }
+            try {
+                await storageSet(S.serializeSettings());
+                showStatus("Settings saved successfully!", "success");
+                render();
+                isDirty = false;
+                updateSaveButtonState();
+            } catch (error) { console.error("Error saving settings:", error); showStatus("Error saving settings", "error"); }
+        });
+        resetBtn.addEventListener("click", async () => {
+            if (!confirm("Reset all settings to default values?")) return;
+            try {
+                state = S.createDefaultState();
+                init();
+                await storageSet(S.serializeSettings());
+                defaultEngineNameInput.value = "";
+                defaultEngineUrlInput.value = "";
+                customEngineNameInput.value = "";
+                customEngineUrlInput.value = "";
+                customEngineQueryModeSelect.value = "titleYear";
+                render();
+                isDirty = false;
+                updateSaveButtonState();
+                showStatus("Settings reset to defaults", "success");
+            } catch (error) { console.error("Error resetting settings:", error); showStatus("Error resetting settings", "error"); }
+        });
 
-    // Handle hash auto-import on page load
-    if (window.location.hash.startsWith("#import=")) {
-        const encoded = window.location.hash.slice("#import=".length);
-        try {
-            const data = decodeSettings(encoded);
-            storageGet(null).then((saved) => {
-                Object.assign(state, normalizeSettings(saved));
-                    const { firstNewId, added, skipped } = importData(data);
-                    if (firstNewId) {
-                        state.activeProfileId = firstNewId;
-                        loadProfileIntoState(state.profiles[firstNewId]);
+        // Toggles
+        const bindToggle = (id, key) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener("change", () => { state[key] = el.checked; isDirty = true; updateSaveButtonState(); });
+        };
+        const bindSelect = (id, key) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener("change", () => { state[key] = el.value; isDirty = true; updateSaveButtonState(); });
+        };
+        bindToggle("imdbEnabledToggle", "imdbEnabled");
+        bindToggle("malEnabledToggle", "malEnabled");
+        bindToggle("grEnabledToggle", "grEnabled");
+        bindToggle("contextMenuToggle", "contextMenuEnabled");
+        bindToggle("malQuickLinkToggle", "malQuickLink");
+        bindSelect("imdbButtonLabelSelect", "imdbButtonLabel");
+        bindSelect("malButtonLabelSelect", "malButtonLabel");
+
+        const emptyToggle = document.getElementById("emptyProfilesToggle");
+        if (emptyToggle) emptyToggle.addEventListener("change", () => { state.emptyProfilesByDefault = emptyToggle.checked; isDirty = true; updateSaveButtonState(); });
+        const collapseDefaultToggle = document.getElementById("collapseDefaultToggle");
+        if (collapseDefaultToggle) collapseDefaultToggle.addEventListener("change", () => { state.collapseDefaultEngines = collapseDefaultToggle.checked; defaultEnginesSection.classList.toggle("collapsed", state.collapseDefaultEngines); isDirty = true; updateSaveButtonState(); });
+        const collapseQuickToggle = document.getElementById("collapseQuickToggle");
+        if (collapseQuickToggle) collapseQuickToggle.addEventListener("change", () => { state.collapseQuickSearchMenu = collapseQuickToggle.checked; menuItemsSection.classList.toggle("collapsed", state.collapseQuickSearchMenu); isDirty = true; updateSaveButtonState(); });
+
+        if (syncToggle) {
+            storageGetSyncEnabled().then(enabled => { syncToggle.checked = enabled; });
+            syncToggle.addEventListener("change", async () => {
+                const enable = syncToggle.checked;
+                if (enable) {
+                    if (!await storageGetSyncEnabled()) {
+                        syncStatus.textContent = "Migrating data to Firefox Sync\u2026";
+                        syncStatus.style.display = "block";
+                        try {
+                            await storageSet(S.serializeSettings());
+                            await storageMigrateLocalToSync();
+                            await storageSetSyncEnabled(true);
+                            syncStatus.textContent = "Sync enabled. Your data will now sync across devices.";
+                            setTimeout(() => { syncStatus.style.display = "none"; }, 4000);
+                        } catch (err) { syncToggle.checked = false; syncStatus.textContent = "Sync error: " + err.message; syncStatus.style.display = "block"; }
                     }
-                    storageSet(serializeSettings()).then(() => {
-                        render();
-                        isDirty = false;
-                        updateSaveButtonState();
-                        const parts = [];
-                        if (added > 0) parts.push(added + " profile(s) added");
-                        if (skipped > 0) parts.push(skipped + " duplicate(s) skipped");
-                        showStatus("Auto-imported: " + (parts.join(", ") || "no changes"), "success");
+                } else {
+                    syncStatus.textContent = "Migrating data to local storage\u2026";
+                    syncStatus.style.display = "block";
+                    try {
+                        await storageSet(S.serializeSettings());
+                        await storageMigrateSyncToLocal();
+                        await storageSetSyncEnabled(false);
+                        syncStatus.textContent = "Sync disabled. Data is now stored locally only.";
+                        setTimeout(() => { syncStatus.style.display = "none"; }, 4000);
+                    } catch (err) { syncToggle.checked = true; syncStatus.textContent = "Migration error: " + err.message; syncStatus.style.display = "block"; }
+                }
+            });
+        }
+
+        // Tab switching
+        document.querySelectorAll(".tab-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+                document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+                btn.classList.add("active");
+                const panel = document.getElementById("tab" + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1));
+                if (panel) panel.classList.add("active");
+            });
+        });
+
+        // Handle hash auto-import on page load
+        if (window.location.hash.startsWith("#import=")) {
+            const encoded = window.location.hash.slice("#import=".length);
+            try {
+                const data = decodeSettings(encoded);
+                S.saveCurrentProfileToState();
+                const { firstNewId, added, skipped } = S.importData(data);
+                if (firstNewId) { state.activeProfileId = firstNewId; S.loadProfileIntoState(state.profiles[firstNewId]); }
+                storageSet(S.serializeSettings()).then(() => {
+                    render();
+                    isDirty = false;
+                    updateSaveButtonState();
+                    const parts = [];
+                    if (added > 0) parts.push(added + " profile(s) added");
+                    if (skipped > 0) parts.push(skipped + " duplicate(s) skipped");
+                    showStatus("Auto-imported: " + (parts.join(", ") || "no changes"), "success");
                     history.replaceState(null, "", window.location.pathname);
                 });
-            });
-        } catch (err) {
-            console.error("Hash auto-import error:", err);
-            showStatus("Failed to auto-import from URL", "error");
+            } catch (err) { console.error("Hash auto-import error:", err); showStatus("Failed to auto-import from URL", "error"); }
         }
-    }
-
-});
+    });
+})();

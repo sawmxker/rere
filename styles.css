@@ -1,68 +1,146 @@
-.imdb-search-wrapper {
-    display: flex;
-    margin-bottom: 12px;
-}
+/* ── Modal ──────────────────────────────────────────── */
 
-.imdb-search-main-btn,
-.imdb-search-dropdown-btn {
-    background: #f5c518;
-    border: none;
-    color: #000;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    transition: all 0.2s;
-}
-
-.imdb-search-main-btn {
-    flex: 1;
-    padding: 12px 16px;
-    border-radius: 4px 0 0 4px;
-    gap: 8px;
-}
-
-.imdb-search-dropdown-btn {
-    width: 40px;
-    border-radius: 0 4px 4px 0;
-    padding: 12px;
-}
-
-.imdb-search-main-btn:hover,
-.imdb-search-dropdown-btn:hover {
-    background: #e2b016;
-}
-
-.imdb-search-modal-overlay {
-    animation: fadeIn 0.2s ease;
-}
-
-.imdb-search-modal {
-    animation: slideIn 0.3s ease;
-}
-
-@keyframes fadeIn {
+@keyframes rereFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
 }
 
-@keyframes slideIn {
-    from {
-        transform: translateY(-20px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
+@keyframes rereSlideIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
 
-.imdb-search-menu-item:hover {
-    background: #2c2c2c !important;
+.rere-modal-overlay {
+    animation: rereFadeIn 0.2s ease;
 }
 
-/* === MyAnimeList Styles === */
+.rere-modal {
+    animation: rereSlideIn 0.3s ease;
+}
+
+/* ── Cover / Poster ─────────────────────────────────── */
+
+.rere-cover {
+    transform-style: preserve-3d;
+}
+
+.rere-cover-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+}
+
+.rere-cover-glare {
+    border-radius: 6px;
+    pointer-events: none;
+    transition: background 0.1s ease-out;
+}
+
+.rere-cover-shine {
+    pointer-events: none;
+}
+
+/* ── Menu Items ─────────────────────────────────────── */
+
+.rere-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    transition: background 0.2s;
+}
+
+.rere-menu-icon {
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+/* ── Icon Buttons ───────────────────────────────────── */
+
+.rere-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background 0.15s, color 0.15s;
+}
+
+/* ── Profile Select ─────────────────────────────────── */
+
+.rere-profile-select {
+    margin-top: 14px;
+    width: 200px;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    outline: none;
+}
+
+/* ── Modal Left / Right Panels ──────────────────────── */
+
+.rere-modal-left {
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0 20px 20px;
+}
+
+.rere-modal-right {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.rere-modal-header {
+    padding: 20px 48px 14px 24px;
+}
+
+.rere-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+}
+
+/* ── Menu Actions ───────────────────────────────────── */
+
+.rere-menu-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: 12px;
+}
+
+/* ── Scrollbar ───────────────────────────────────────── */
+
+.rere-modal-right::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rere-modal-right::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.rere-modal-right::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+}
+
+/* ── IMDb Button Overrides ──────────────────────────── */
+
+#imdb-search-btn {
+    margin-bottom: 12px;
+}
+
+/* ── MAL Button ─────────────────────────────────────── */
 
 #mal-search-btn {
     font-family: Verdana, Arial;
@@ -70,4 +148,24 @@
 
 #mal-search-btn a {
     transition: background-color 0.15s, border-color 0.15s;
+}
+
+/* ── Goodreads Button ────────────────────────────────── */
+
+#gr-search-btn {
+    font-family: Merriweather, Georgia, serif;
+}
+
+#gr-search-btn a {
+    transition: background-color 0.15s;
+}
+
+/* ── Dark Mode for MAL ──────────────────────────────── */
+
+html.dark-mode .rere-modal-overlay {
+    background: rgba(0,0,0,0.85);
+}
+
+html:not(.dark-mode) .rere-modal-overlay {
+    background: rgba(0,0,0,0.6);
 }

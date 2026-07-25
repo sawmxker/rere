@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
   "name": "reré: Quick ReSearching",
-  "version": "0.2.46",
-  "description": "Adds convenient search buttons to IMDb and MyAnimeList, with profiles, per-site settings, and context menu.",
+  "version": "0.2.49",
+  "description": "Adds convenient search buttons to IMDb, MyAnimeList, and Goodreads, with profiles, per-site settings, and context menu.",
 
   "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
-  "host_permissions": ["*://www.imdb.com/*", "*://myanimelist.net/*", "*://api.jikan.moe/*", "*://v3.sg.media-imdb.com/*"],
+  "host_permissions": ["*://www.imdb.com/*", "*://myanimelist.net/*", "*://www.goodreads.com/*", "*://api.jikan.moe/*", "*://v3.sg.media-imdb.com/*"],
 
   "browser_specific_settings": {
     "gecko": {
@@ -25,12 +25,17 @@
   "content_scripts": [
     {
       "matches": ["*://www.imdb.com/title/*"],
-      "js": ["storage.js", "content.js"],
+      "js": ["storage.js", "shared/content-utils.js", "content.js"],
       "css": ["styles.css"]
     },
     {
       "matches": ["*://myanimelist.net/anime/*", "*://myanimelist.net/manga/*"],
-      "js": ["storage.js", "mal-content.js"],
+      "js": ["storage.js", "shared/content-utils.js", "mal-content.js"],
+      "css": ["styles.css"]
+    },
+    {
+      "matches": ["*://www.goodreads.com/book/show/*"],
+      "js": ["storage.js", "shared/content-utils.js", "gr-content.js"],
       "css": ["styles.css"]
     }
   ],

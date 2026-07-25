@@ -107,6 +107,7 @@ function _extractDomains(state) {
         collapseQuickSearchMenu: state.collapseQuickSearchMenu,
         imdbEnabled: state.imdbEnabled,
         malEnabled: state.malEnabled,
+        grEnabled: state.grEnabled,
         contextMenuEnabled: state.contextMenuEnabled,
         imdbButtonLabel: state.imdbButtonLabel,
         malButtonLabel: state.malButtonLabel,
