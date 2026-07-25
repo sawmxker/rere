@@ -212,6 +212,14 @@
         return wrapper;
     }
 
+    function updateButtonBorder(color) {
+        const wrapper = document.querySelector('#gr-search-btn');
+        if (!wrapper) return;
+        wrapper.querySelectorAll('a').forEach(a => {
+            a.style.borderColor = color;
+        });
+    }
+
     function addButton() {
         if (document.querySelector('#gr-search-btn')) return;
 
@@ -224,11 +232,14 @@
                    document.querySelector('.BookActions');
         if (!ba) return;
 
-        storageGet(["grEnabled"]).then(data => {
+        storageGet(["grEnabled", "grSubtleBorder"]).then(data => {
             if (data.grEnabled === false) {
                 const existing = document.querySelector('#gr-search-btn');
                 if (existing) existing.remove();
                 return;
+            }
+            if (data.grSubtleBorder === true) {
+                updateButtonBorder('#dcdcdc');
             }
         });
 
