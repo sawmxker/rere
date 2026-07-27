@@ -114,9 +114,62 @@ browser.runtime.onMessage.addListener((msg, sender) => {
     }
 });
 
+async function jikanSearchAnime(title) {
+    try {
+        const json = await _rateLimitedFetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=10`);
+        if (json && json.data && json.data.length > 0) {
+            const exact = json.data.find(item =>
+                item.title === title ||
+                (item.title_english && item.title_english === title) ||
+                (item.title_synonyms && item.title_synonyms.some(s => s === title))
+            );
+            if (exact) return exact.url;
+            const lower = title.toLowerCase();
+            const fuzzy = json.data.find(item =>
+                item.title.toLowerCase() === lower ||
+                (item.title_english && item.title_english.toLowerCase() === lower) ||
+                (item.title_synonyms && item.title_synonyms.some(s => s.toLowerCase() === lower))
+            );
+            if (fuzzy) return fuzzy.url;
+            return json.data[0].url;
+        }
+    } catch {}
+    return null;
+}
+
+async function imdbSearchTitle(title, year) {
+    try {
+        const firstLetter = encodeURIComponent(title.charAt(0).toLowerCase());
+        const json = await _rateLimitedFetch(`https://v3.sg.media-imdb.com/suggestion/${firstLetter}/${encodeURIComponent(title)}.json`);
+        if (json && json.d && json.d.length > 0) {
+            const items = json.d.filter(item => item.id);
+            if (items.length === 0) return null;
+            if (year) {
+                const yearNum = parseInt(year, 10);
+                if (!isNaN(yearNum)) {
+                    const yearExact = items.find(item => item.y === yearNum && item.l === title);
+                    if (yearExact) return `https://www.imdb.com/title/${yearExact.id}/`;
+                    const yearFuzzy = items.find(item => item.y === yearNum);
+                    if (yearFuzzy) return `https://www.imdb.com/title/${yearFuzzy.id}/`;
+                    const yearClose = items.find(item => item.y && Math.abs(item.y - yearNum) <= 1);
+                    if (yearClose) return `https://www.imdb.com/title/${yearClose.id}/`;
+                }
+            }
+            const exactTitle = items.find(item => item.l === title);
+            if (exactTitle) return `https://www.imdb.com/title/${exactTitle.id}/`;
+            const lower = title.toLowerCase();
+            const fuzzyTitle = items.find(item => item.l.toLowerCase() === lower);
+            if (fuzzyTitle) return `https://www.imdb.com/title/${fuzzyTitle.id}/`;
+            return `https://www.imdb.com/title/${items[0].id}/`;
+        }
+    } catch {}
+    return null;
+}
+
 browser.contextMenus.onClicked.addListener((info, tab) => {
     if (!info.selectionText) return;
-    const query = encodeURIComponent(info.selectionText.trim());
+    const rawText = info.selectionText.trim();
+    const query = encodeURIComponent(rawText);
     const parts = info.menuItemId.split("|");
 
     if (parts[0] !== "rere" || parts.length < 3) return;
@@ -126,7 +179,7 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
 
     if (type !== "p" && type !== "m") return;
 
-    storageGet(null).then(data => {
+    storageGet(null).then(async data => {
         const profiles = data.profiles || {};
         const profile = profiles[profileId];
         if (!profile) return;
@@ -143,7 +196,25 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
         }
 
         if (!item || !item.url) return;
-        const url = resolveUrl(item.url, data, query);
-        if (url) browser.tabs.create({ url });
+
+        const isMalUrl = (item.url || "").toLowerCase().includes("myanimelist.net");
+        const isImdbUrl = (item.url || "").toLowerCase().includes("imdb.com");
+        const malMode = item.malApiMode || "none";
+        const imdbMode = item.imdbApiMode || "none";
+
+        let resolvedUrl = null;
+
+        if (isMalUrl && (malMode === "always" || malMode === "split")) {
+            resolvedUrl = await jikanSearchAnime(rawText);
+        } else if (isImdbUrl && (imdbMode === "always" || imdbMode === "split")) {
+            resolvedUrl = await imdbSearchTitle(rawText, null);
+        }
+
+        if (resolvedUrl) {
+            browser.tabs.create({ url: resolvedUrl });
+        } else {
+            const url = resolveUrl(item.url, data, query);
+            if (url) browser.tabs.create({ url });
+        }
     });
 });

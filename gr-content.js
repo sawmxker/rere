@@ -225,12 +225,16 @@
 
         const btn = createButton();
         const actionDiv = document.createElement('div');
+        actionDiv.id = 'gr-search-btn';
         actionDiv.style.cssText = 'width:100%;margin:2px 0 4px 0;';
         actionDiv.appendChild(btn);
 
+        const leftColumn = document.querySelector('.BookPage__leftColumn');
         const ba = document.querySelector('.BookPage__leftColumn .BookActions') ||
                    document.querySelector('.BookActions');
-        if (!ba) return;
+        if (!leftColumn && !ba) return;
+
+        const insertTarget = leftColumn || ba;
 
         storageGet(["grEnabled", "grSubtleBorder"]).then(data => {
             if (data.grEnabled === false) {
@@ -243,7 +247,7 @@
             }
         });
 
-        const wtr = ba.querySelector('[aria-label*="want to read"], [aria-label*="Want to Read"]');
+        const wtr = ba ? ba.querySelector('[aria-label*="want to read"], [aria-label*="Want to Read"]') : null;
         if (wtr) {
             const parentAction = wtr.closest('.BookActions__button') || wtr.parentElement;
             if (parentAction && parentAction.parentNode === ba) {
@@ -251,12 +255,12 @@
             } else {
                 const firstAction = ba.querySelector(':scope > .BookActions__button');
                 if (firstAction) firstAction.after(actionDiv);
-                else ba.prepend(actionDiv);
+                else insertTarget.prepend(actionDiv);
             }
         } else {
-            const firstAction = ba.querySelector(':scope > .BookActions__button');
+            const firstAction = ba ? ba.querySelector(':scope > .BookActions__button') : null;
             if (firstAction) firstAction.after(actionDiv);
-            else ba.prepend(actionDiv);
+            else insertTarget.prepend(actionDiv);
         }
     }
 
@@ -380,15 +384,13 @@
     }
 
     function tryAddButton() {
+        if (document.querySelector('#gr-search-btn')) return true;
+        const leftColumn = document.querySelector('.BookPage__leftColumn');
         const ba = document.querySelector('.BookPage__leftColumn .BookActions') ||
                    document.querySelector('.BookActions');
-        if (!ba) return false;
-        if (ba.querySelector('[aria-label*="want to read"], [aria-label*="Want to Read"]') ||
-            ba.querySelector(':scope > .BookActions__button')) {
-            addButton();
-            return true;
-        }
-        return false;
+        if (!leftColumn && !ba) return false;
+        addButton();
+        return true;
     }
 
     if (!tryAddButton()) {
@@ -398,8 +400,15 @@
             }
         });
         observer.observe(document.body, { childList: true, subtree: true });
-        setTimeout(() => observer.disconnect(), 15000);
+        setTimeout(() => observer.disconnect(), 30000);
     }
+
+    const reattachObserver = new MutationObserver(() => {
+        if (!document.querySelector('#gr-search-btn') && document.querySelector('.BookPage__leftColumn, .BookActions')) {
+            setTimeout(() => tryAddButton(), 50);
+        }
+    });
+    reattachObserver.observe(document.body, { childList: true, subtree: true });
 
     if (window.history?.pushState) {
         const originalPushState = history.pushState;
@@ -409,7 +418,7 @@
                 if (!document.querySelector('#gr-search-btn')) {
                     tryAddButton();
                 }
-            }, 500);
+            }, 300);
         };
     }
 })();

@@ -124,9 +124,24 @@ window.__RERESHARED__ = (function () {
         try {
             const json = await browser.runtime.sendMessage({
                 type: "apiFetch",
-                url: `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`
+                url: `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=10`
             });
-            if (json && json.data && json.data.length > 0) return json.data[0].url;
+            if (json && json.data && json.data.length > 0) {
+                const exact = json.data.find(item =>
+                    item.title === title ||
+                    (item.title_english && item.title_english === title) ||
+                    (item.title_synonyms && item.title_synonyms.some(s => s === title))
+                );
+                if (exact) return exact.url;
+                const lower = title.toLowerCase();
+                const fuzzy = json.data.find(item =>
+                    item.title.toLowerCase() === lower ||
+                    (item.title_english && item.title_english.toLowerCase() === lower) ||
+                    (item.title_synonyms && item.title_synonyms.some(s => s.toLowerCase() === lower))
+                );
+                if (fuzzy) return fuzzy.url;
+                return json.data[0].url;
+            }
         } catch {}
         return null;
     }
@@ -156,11 +171,26 @@ window.__RERESHARED__ = (function () {
                 type: "apiFetch",
                 url: `https://v3.sg.media-imdb.com/suggestion/${firstLetter}/${encodeURIComponent(title)}.json`
             });
-            if (json && json.d && json.d.length > 0 && json.d[0].id) {
-                const apiYear = json.d[0].y;
-                if (!year || (apiYear && Math.abs(apiYear - year) <= 1)) {
-                    return `https://www.imdb.com/title/${json.d[0].id}/`;
+            if (json && json.d && json.d.length > 0) {
+                const items = json.d.filter(item => item.id);
+                if (items.length === 0) return searchUrl;
+                if (year) {
+                    const yearNum = parseInt(year, 10);
+                    if (!isNaN(yearNum)) {
+                        const yearExact = items.find(item => item.y === yearNum && item.l === title);
+                        if (yearExact) return `https://www.imdb.com/title/${yearExact.id}/`;
+                        const yearFuzzy = items.find(item => item.y === yearNum);
+                        if (yearFuzzy) return `https://www.imdb.com/title/${yearFuzzy.id}/`;
+                        const yearClose = items.find(item => item.y && Math.abs(item.y - yearNum) <= 1);
+                        if (yearClose) return `https://www.imdb.com/title/${yearClose.id}/`;
+                    }
                 }
+                const exactTitle = items.find(item => item.l === title);
+                if (exactTitle) return `https://www.imdb.com/title/${exactTitle.id}/`;
+                const lower = title.toLowerCase();
+                const fuzzyTitle = items.find(item => item.l.toLowerCase() === lower);
+                if (fuzzyTitle) return `https://www.imdb.com/title/${fuzzyTitle.id}/`;
+                return `https://www.imdb.com/title/${items[0].id}/`;
             }
         } catch {}
         return searchUrl;
