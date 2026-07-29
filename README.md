@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>Adds convenient search buttons to IMDb and MyAnimeList for quick research on any resources you prefer.</strong>
+  <strong>Adds convenient search buttons to IMDb, MyAnimeList, and Goodreads for quick research on any resources you prefer.</strong>
 </p>
 
 <p align="center">
@@ -18,23 +18,27 @@
 
 ## Overview
 
-**reré** is a lightweight and functional browser extension that saves you time when browsing IMDb and MyAnimeList.
+**reré** is a lightweight and functional browser extension that saves you time when browsing IMDb, MyAnimeList, and Goodreads.
 
-It adds a quick search button directly to movie, TV show, anime, and manga pages, allowing you to instantly navigate to your favorite resources: streaming sites, trackers, anime databases, or forums.
+It adds a quick search button directly to movie, TV show, anime, manga, and book pages, allowing you to instantly navigate to your favorite resources: streaming sites, trackers, databases, or forums.
 
 ---
 
 ## Features
 
-- Quick search from IMDb and MyAnimeList by title on your preferred resources
-- Profile system — separate search configurations for IMDb, MAL Anime, and MAL Manga
+- Quick search from **IMDb**, **MyAnimeList**, and **Goodreads** by title on your preferred resources
+- Profile system — separate search configurations for IMDb, MAL Anime, MAL Manga, and Goodreads
 - Per-site enable toggles and custom button labels
 - Context menu search — right-click selected text on any page
 - Customizable search parameters with your own search engines and suffixes
 - Export/import settings via JSON file or encoded link
 - Drag-and-drop reordering of search engines and menu items
+- Icon picker for custom favicons per search engine
+- Collapsible sections for cleaner settings layout
+- Firefox Sync support
+- MAL Quick Link (Jikan API) — get direct MAL page links from other sites
+- MAL dark mode support
 - Minimalistic and unobtrusive interface
-- Supports MAL dark mode
 
 ---
 
@@ -51,12 +55,17 @@ or see the Development block below
 ## Usage
 
 ### On IMDb page
-1. Open any IMDb page for a movie, anime, TV series, game, etc.
+1. Open any IMDb page for a movie, TV series, game, etc.
 2. Click the Search button for a quick search. A new tab will open with the title from the page + year + query suffix.
 3. Click the drop-down list to the right of the button. Select the item you prefer from the Quick Search Menu.
 
 ### On MyAnimeList page
 1. Open any anime (`/anime/`) or manga (`/manga/`) page.
+2. Click the "reré: search" button. A new tab will open with the title + year + query suffix.
+3. Click the drop-down list to the right of the button for the Quick Search Menu.
+
+### On Goodreads page
+1. Open any book page.
 2. Click the "reré: search" button. A new tab will open with the title + year + query suffix.
 3. Click the drop-down list to the right of the button for the Quick Search Menu.
 
@@ -67,13 +76,13 @@ or see the Development block below
 
 ### Settings
 1. Open Settings.
-2. Create profiles for IMDb, MAL Anime, or MAL Manga.
+2. Create profiles for IMDb, MAL Anime, MAL Manga, or Goodreads.
 3. Add Default Search Engines; they will open when you click the Search button.
    example: `https://www.perplexity.ai/search/?q={query}`
-4. Add Custom Search Engines; they will be available in the Quick Search Menu.
+4. Add Quick Search Menu Items; they will be available in the dropdown.
    example: `https://www.google.com/search?q=site:myanimelist.net+{query}&btnI`
-5. Configure per-site toggles and button labels in Additional Settings.
-6. Drag to reorder engines and menu items.
+5. Configure per-site toggles, button labels, title modes, and more in Additional Settings.
+6. Drag to reorder engines and menu items. Click an engine icon to change it.
 
 ---
 
@@ -81,7 +90,7 @@ or see the Development block below
 
 The extension requires the following minimum permissions to function correctly:
 
-- Access to the contents of IMDb and MyAnimeList pages to detect titles and add search buttons.
+- Access to the contents of IMDb, MyAnimeList, and Goodreads pages to detect titles and add search buttons.
 - Ability to open new tabs with search queries when you click the buttons.
 - Storage access to save your custom search templates, profiles, and preferences.
 - Context menu integration for right-click search on any page.
