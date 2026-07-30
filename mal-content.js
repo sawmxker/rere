@@ -438,4 +438,37 @@
             }, 500);
         };
     }
+
+    browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        if (msg.type === "quickSearch") {
+            (async () => {
+                try {
+                    const { title, year, englishTitle } = getTitleAndYear();
+                    const data = await storageGet(null);
+                    const currentSite = getSiteForCurrentPage();
+                    const matchingEntry = currentSite ? Object.entries(data.profiles || {}).find(([, p]) => p.site === currentSite) : null;
+                    if (matchingEntry) {
+                        const settings = normalizeSettings(data, matchingEntry[0]);
+                        const selectedEngine = R.getSelectedEngine(settings);
+                        const effectiveTitle = settings.searchTitleMode === 'english' && englishTitle ? englishTitle : title;
+                        const query = R.buildQuery(effectiveTitle, year, settings.searchQueryMode, settings.suffix);
+                        const url = R.buildUrl(selectedEngine.url, query, effectiveTitle, year, settings, settings.searchQueryMode);
+                        sendResponse({ url });
+                    } else {
+                        sendResponse({ error: true });
+                    }
+                } catch (error) {
+                    sendResponse({ error: true });
+                }
+            })();
+            return true;
+        }
+        if (msg.type === "openModal") {
+            const { title, year, englishTitle } = getTitleAndYear();
+            if (currentModal) { closeMenu(); return; }
+            currentModal = createModal(title, year, getPosterUrl(), englishTitle);
+            document.body.appendChild(currentModal);
+            document.body.style.overflow = 'hidden';
+        }
+    });
 })();

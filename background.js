@@ -218,3 +218,43 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
         }
     });
 });
+
+browser.commands.onCommand.addListener(async (command) => {
+  if (command === "quick-search") {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+
+    try {
+      const response = await browser.tabs.sendMessage(tab.id, { type: "quickSearch" });
+      if (response && response.url) {
+        browser.tabs.create({ url: response.url });
+        return;
+      }
+    } catch {}
+
+    try {
+      const results = await browser.tabs.executeScript(tab.id, {
+        code: "window.getSelection().toString()"
+      });
+      const selected = (results[0] || "").trim();
+      if (selected) {
+        const data = await storageGet(null);
+        const suffix = data.suffix || "";
+        const rawQuery = selected + (suffix ? " " + suffix : "");
+        const url = resolveUrl("__DEFAULT_ENGINE__", data, encodeURIComponent(rawQuery));
+        if (url) browser.tabs.create({ url });
+      }
+    } catch (e) {
+      console.error("Quick search fallback failed:", e);
+    }
+  }
+
+  if (command === "detailed-search") {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+
+    try {
+      await browser.tabs.sendMessage(tab.id, { type: "openModal" });
+    } catch {}
+  }
+});

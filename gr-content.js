@@ -421,4 +421,37 @@
             }, 300);
         };
     }
+
+    browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        if (msg.type === "quickSearch") {
+            (async () => {
+                try {
+                    const { title, originalTitle, year } = getTitleAndYear();
+                    const data = await storageGet(null);
+                    ensureGoodreadsProfile(data);
+                    const matchingEntry = Object.entries(data.profiles || {}).find(([, p]) => p.site === "goodreads");
+                    if (matchingEntry) {
+                        const settings = normalizeSettings(data, matchingEntry[0]);
+                        const effectiveTitle = settings.searchTitleMode === 'original' && originalTitle ? originalTitle : title;
+                        const selectedEngine = R.getSelectedEngine(settings);
+                        const query = R.buildQuery(effectiveTitle, year, settings.searchQueryMode, settings.suffix);
+                        const url = R.buildUrl(selectedEngine.url, query, effectiveTitle, year, settings, settings.searchQueryMode);
+                        sendResponse({ url });
+                    } else {
+                        sendResponse({ error: true });
+                    }
+                } catch (error) {
+                    sendResponse({ error: true });
+                }
+            })();
+            return true;
+        }
+        if (msg.type === "openModal") {
+            const { title, originalTitle, year } = getTitleAndYear();
+            if (currentModal) { closeMenu(); return; }
+            currentModal = createModal(title, originalTitle, year, getPosterUrl());
+            lockScroll();
+            document.body.appendChild(currentModal);
+        }
+    });
 })();

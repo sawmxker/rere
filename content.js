@@ -351,4 +351,36 @@
             }, 500);
         };
     }
+
+    browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        if (msg.type === "quickSearch") {
+            (async () => {
+                try {
+                    const { title, year } = getTitleAndYear();
+                    const data = await storageGet(null);
+                    const profiles = data.profiles || {};
+                    const matchingEntry = Object.entries(profiles).find(([, p]) => p.site === "imdb");
+                    if (matchingEntry) {
+                        const settings = normalizeSettings(data, matchingEntry[0]);
+                        const selectedEngine = R.getSelectedEngine(settings);
+                        const query = R.buildQuery(title, year, settings.searchQueryMode, settings.suffix);
+                        const url = R.buildUrl(selectedEngine.url, query, title, year, settings, settings.searchQueryMode);
+                        sendResponse({ url });
+                    } else {
+                        sendResponse({ error: true });
+                    }
+                } catch (error) {
+                    sendResponse({ error: true });
+                }
+            })();
+            return true;
+        }
+        if (msg.type === "openModal") {
+            const { title, year } = getTitleAndYear();
+            if (currentModal) { closeMenu(); return; }
+            currentModal = createModal(title, year, getPosterUrl());
+            document.body.appendChild(currentModal);
+            document.body.style.overflow = 'hidden';
+        }
+    });
 })();
