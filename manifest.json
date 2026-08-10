@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "reré: Quick ReSearching",
-  "version": "0.2.89",
+  "version": "0.2.97",
   "description": "Adds convenient search buttons to IMDb, MyAnimeList, and Goodreads, with profiles, per-site settings, and context menu.",
 
   "permissions": ["tabs", "storage", "activeTab", "contextMenus", "scripting"],
