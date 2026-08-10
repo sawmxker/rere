@@ -665,6 +665,7 @@
         setChecked("malQuickLinkToggle", state.malQuickLink);
         setVal("imdbButtonLabelSelect", state.imdbButtonLabel);
         setVal("malButtonLabelSelect", state.malButtonLabel);
+        renderAddons();
     }
 
     function hasMalDetection() {
@@ -820,6 +821,473 @@
     pickFromMenuBtn.addEventListener("click", () => { populatePicker(); menuPickerModal.classList.add("show"); });
     pickerCloseBtn.addEventListener("click", () => { menuPickerModal.classList.remove("show"); });
     menuPickerModal.addEventListener("click", (e) => { if (e.target === menuPickerModal) menuPickerModal.classList.remove("show"); });
+
+    // ── Addons ────────────────────────────────────────────────
+
+    const addonBuilderBox = document.getElementById("addonBuilderBox");
+    const addonDomainInput = document.getElementById("addonDomain");
+    const addonNameInput = document.getElementById("addonName");
+    const addAddonBtn = document.getElementById("addAddonBtn");
+    const cancelAddonBtn = document.getElementById("cancelAddonBtn");
+    const addonsList = document.getElementById("addonsList");
+
+    const addonExpanded = {};
+    const addonSelectedFile = {};
+
+    addAddonBtn.addEventListener("click", () => {
+        const domain = addonDomainInput.value.trim();
+        if (!domain) { showStatus("Enter a site domain", "error"); return; }
+        const existing = state.addons.some(a => a.domain.toLowerCase() === domain.toLowerCase());
+        if (existing) {
+            showStatus("An addon for this domain already exists", "error");
+            return;
+        }
+        const addon = S.normalizeAddon({
+            id: S.makeId("addon"),
+            domain,
+            name: addonNameInput.value.trim() || domain
+        });
+        state.addons.push(addon);
+        addonExpanded[addon.id] = true;
+        isDirty = true;
+        updateSaveButtonState();
+        renderAddons();
+        hideAddonBuilder();
+    });
+
+    function hideAddonBuilder() {
+        addonBuilderBox.style.display = "none";
+        cancelAddonBtn.style.display = "none";
+        addonDomainInput.value = "";
+        addonNameInput.value = "";
+    }
+
+    cancelAddonBtn.addEventListener("click", hideAddonBuilder);
+    document.getElementById("openAddonBuilderBtn").addEventListener("click", () => {
+        addonBuilderBox.style.display = "block";
+        addonDomainInput.focus();
+    });
+
+    function renderAddons() {
+        addonsList.innerHTML = "";
+        if (!state.addons || state.addons.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "empty-state";
+            empty.textContent = "No addons yet. Add a folder to start customizing a site.";
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "mini-btn";
+            btn.textContent = "+ Add Addon";
+            btn.style.cssText = "margin-left:12px;";
+            btn.onclick = () => { addonBuilderBox.style.display = "block"; };
+            empty.appendChild(btn);
+            addonsList.appendChild(empty);
+            return;
+        }
+        state.addons.forEach((addon) => addonsList.appendChild(createAddonCard(addon)));
+    }
+
+    function createCompactToggle(checked, onChange, title) {
+        const label = document.createElement("label");
+        label.className = "compact-toggle";
+        label.title = title || "";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = checked;
+        cb.addEventListener("change", () => onChange(cb.checked));
+        const slider = document.createElement("span");
+        slider.className = "compact-toggle-slider";
+        label.appendChild(cb);
+        label.appendChild(slider);
+        return label;
+    }
+
+    function createAddonCard(addon) {
+        const card = document.createElement("div");
+        card.className = "engine-card addon-card";
+
+        const header = document.createElement("div");
+        header.className = "engine-card-header addon-card-header";
+
+        const chevron = document.createElement("span");
+        chevron.className = "addon-chevron";
+        chevron.textContent = "\u25B8";
+
+        const title = document.createElement("div");
+        title.className = "engine-title addon-title";
+        title.style.cssText = "flex:1;min-width:0;cursor:pointer;";
+
+        const favicon = document.createElement("img");
+        favicon.className = "engine-icon";
+        favicon.src = "https://" + addon.domain.replace(/^https?:\/\//, "").split("/")[0] + "/favicon.ico";
+        favicon.referrerPolicy = "no-referrer";
+        favicon.onerror = () => favicon.replaceWith(S.createFallbackIcon(addon.domain.charAt(0) || "?"));
+        title.appendChild(favicon);
+
+        const text = document.createElement("div");
+        text.className = "engine-title-text";
+        text.style.cssText = "flex:1;min-width:0;";
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.value = addon.name || addon.domain;
+        nameInput.className = "addon-name-input";
+        nameInput.addEventListener("input", () => { addon.name = nameInput.value; isDirty = true; updateSaveButtonState(); });
+        text.appendChild(nameInput);
+        const domainInput = document.createElement("input");
+        domainInput.type = "text";
+        domainInput.value = addon.domain;
+        domainInput.className = "addon-domain-input";
+        domainInput.placeholder = "example.com";
+        domainInput.addEventListener("input", () => { addon.domain = domainInput.value.trim(); isDirty = true; updateSaveButtonState(); });
+        text.appendChild(domainInput);
+        title.appendChild(text);
+
+        const actions = document.createElement("div");
+        actions.className = "engine-actions addon-actions";
+        actions.style.cssText = "align-items:center;";
+
+        const enabledToggle = createCompactToggle(addon.enabled !== false, (v) => {
+            addon.enabled = v;
+            isDirty = true;
+            updateSaveButtonState();
+        }, "Enable/disable this addon");
+        actions.appendChild(enabledToggle);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "mini-btn mini-btn-danger";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = () => {
+            state.addons = state.addons.filter(a => a.id !== addon.id);
+            delete addonExpanded[addon.id];
+            delete addonSelectedFile[addon.id];
+            isDirty = true;
+            updateSaveButtonState();
+            renderAddons();
+        };
+        actions.appendChild(deleteBtn);
+        header.appendChild(chevron);
+        header.appendChild(title);
+        header.appendChild(actions);
+        card.appendChild(header);
+
+        const body = document.createElement("div");
+        body.className = "addon-body";
+        const isExpanded = addonExpanded[addon.id] !== false;
+        if (isExpanded) chevron.classList.add("open");
+
+        const toggleBody = () => {
+            const show = body.style.display === "none";
+            body.style.display = show ? "" : "none";
+            addonExpanded[addon.id] = show;
+            chevron.classList.toggle("open", show);
+        };
+        title.onclick = toggleBody;
+        chevron.onclick = toggleBody;
+
+        const panes = document.createElement("div");
+        panes.className = "addon-panes";
+
+        // ── Left: file tree ──
+        const tree = document.createElement("div");
+        tree.className = "addon-tree";
+
+        const treeHeader = document.createElement("div");
+        treeHeader.className = "addon-tree-header";
+        const treeLabel = document.createElement("span");
+        treeLabel.textContent = "Files (" + addon.files.length + ")";
+        treeHeader.appendChild(treeLabel);
+        tree.appendChild(treeHeader);
+
+        const addFileRow = document.createElement("div");
+        addFileRow.className = "addon-add-file-row";
+        const fileTypeSelect = document.createElement("select");
+        fileTypeSelect.innerHTML = '<option value="css">CSS</option><option value="js">JS</option>';
+        fileTypeSelect.style.cssText = "width:auto;padding:4px 6px;font-size:11px;flex-shrink:0;";
+        const fileNameInput = document.createElement("input");
+        fileNameInput.type = "text";
+        fileNameInput.placeholder = "style.css";
+        fileNameInput.style.cssText = "flex:1;min-width:0;padding:4px 8px;font-size:11px;";
+        const addFileBtn = document.createElement("button");
+        addFileBtn.type = "button";
+        addFileBtn.className = "mini-btn";
+        addFileBtn.textContent = "+";
+        addFileBtn.title = "Add file";
+        addFileBtn.onclick = () => {
+            const type = fileTypeSelect.value;
+            const fname = fileNameInput.value.trim() || (type === "css" ? "style.css" : "script.js");
+            const file = S.normalizeAddonFile({ id: S.makeId("addonfile"), name: fname, type });
+            addon.files.push(file);
+            addonSelectedFile[addon.id] = file.id;
+            isDirty = true;
+            updateSaveButtonState();
+            renderAddons();
+        };
+        addFileRow.appendChild(fileTypeSelect);
+        addFileRow.appendChild(fileNameInput);
+        addFileRow.appendChild(addFileBtn);
+        tree.appendChild(addFileRow);
+
+        const fileList = document.createElement("div");
+        fileList.className = "addon-file-list";
+        if (addon.files.length === 0) {
+            const none = document.createElement("div");
+            none.className = "help-text";
+            none.textContent = "No files yet.";
+            none.style.cssText = "padding:8px;text-align:center;";
+            fileList.appendChild(none);
+        } else {
+            addon.files.forEach((file) => {
+                fileList.appendChild(createFileTreeItem(addon, file));
+            });
+        }
+        tree.appendChild(fileList);
+        panes.appendChild(tree);
+
+        // ── Right: selected file editor ──
+        const editorPane = document.createElement("div");
+        editorPane.className = "addon-editor-pane";
+        const selectedId = addonSelectedFile[addon.id];
+        const selected = addon.files.find(f => f.id === selectedId) || addon.files[0] || null;
+        if (selected) {
+            addonSelectedFile[addon.id] = selected.id;
+            editorPane.appendChild(createFileEditor(addon, selected));
+        } else {
+            const placeholder = document.createElement("div");
+            placeholder.className = "empty-state";
+            placeholder.textContent = "Select a file to edit it.";
+            placeholder.style.cssText = "margin:8px;";
+            editorPane.appendChild(placeholder);
+        }
+        panes.appendChild(editorPane);
+
+        body.appendChild(panes);
+        card.appendChild(body);
+
+        body.style.display = isExpanded ? "" : "none";
+        return card;
+    }
+
+    function createFileTreeItem(addon, file) {
+        const row = document.createElement("div");
+        row.className = "addon-file-item";
+        const selectedId = addonSelectedFile[addon.id];
+        if (selectedId === file.id) row.classList.add("selected");
+        if (file.enabled === false) row.classList.add("disabled-file");
+
+        const name = document.createElement("span");
+        name.className = "addon-file-name";
+        name.textContent = file.name || (file.type === "css" ? "style.css" : "script.js");
+        name.title = file.name;
+        const badge = document.createElement("span");
+        badge.className = "engine-badge addon-file-badge";
+        badge.textContent = file.type === "js" ? "JS" : "CSS";
+        row.appendChild(name);
+        row.appendChild(badge);
+
+        const toggle = createCompactToggle(file.enabled !== false, (v) => {
+            file.enabled = v;
+            row.classList.toggle("disabled-file", !v);
+            isDirty = true;
+            updateSaveButtonState();
+        }, "Enable/disable this file");
+        toggle.style.cssText = "flex-shrink:0;";
+        row.appendChild(toggle);
+
+        row.onclick = (e) => {
+            if (e.target.closest(".compact-toggle")) return;
+            addonSelectedFile[addon.id] = file.id;
+            renderAddons();
+        };
+        return row;
+    }
+
+    function createFileEditor(addon, file) {
+        const editor = document.createElement("div");
+        editor.className = "addon-file-editor";
+
+        const head = document.createElement("div");
+        head.className = "addon-file-editor-head";
+
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.value = file.name;
+        nameInput.className = "addon-filename-input";
+        nameInput.addEventListener("input", () => { file.name = nameInput.value; isDirty = true; updateSaveButtonState(); });
+        head.appendChild(nameInput);
+
+        const typeSelect = document.createElement("select");
+        typeSelect.innerHTML = '<option value="css">Style (CSS)</option><option value="js">Script (JS)</option>';
+        typeSelect.value = file.type === "js" ? "js" : "css";
+        typeSelect.className = "addon-filetype-select";
+        typeSelect.addEventListener("change", () => {
+            file.type = typeSelect.value === "js" ? "js" : "css";
+            isDirty = true;
+            updateSaveButtonState();
+            renderAddons();
+        });
+        head.appendChild(typeSelect);
+
+        const toggle = createCompactToggle(file.enabled !== false, (v) => {
+            file.enabled = v;
+            isDirty = true;
+            updateSaveButtonState();
+        }, "Enable/disable this file");
+        head.appendChild(toggle);
+
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "mini-btn mini-btn-danger";
+        del.textContent = "Delete";
+        del.onclick = () => {
+            addon.files = addon.files.filter(f => f.id !== file.id);
+            delete addonSelectedFile[addon.id];
+            isDirty = true;
+            updateSaveButtonState();
+            renderAddons();
+        };
+        head.appendChild(del);
+        editor.appendChild(head);
+
+        editor.appendChild(createCodeEditor(file));
+        return editor;
+    }
+
+    // ── Code editor (syntax highlight + Tab) ──────────────────
+
+    const CSS_TOKENS = [
+        { re: "\\/\\*[\\s\\S]*?\\*\\/", cls: "tok-c" },
+        { re: "'(?:[^'\\\\\\n]|\\\\.)*'|\"(?:[^\"\\\\\\n]|\\\\.)*\"", cls: "tok-s" },
+        { re: "@[\\w-]+", cls: "tok-a" },
+        { re: "#[0-9a-fA-F]{3,8}\\b", cls: "tok-h" },
+        { re: "\\b\\d+(?:\\.\\d+)?(?:px|em|rem|%|vh|vw|vmin|vmax|s|ms|deg|fr|pt|ex|ch)?\\b", cls: "tok-n" },
+        { re: "[{}();:,>+~=]", cls: "tok-p" },
+        { re: "[a-zA-Z-]+(?=\\s*:)", cls: "tok-k" }
+    ];
+    const JS_TOKENS = [
+        { re: "\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/", cls: "tok-c" },
+        { re: "'(?:[^'\\\\\\n]|\\\\.)*'|\"(?:[^\"\\\\\\n]|\\\\.)*\"", cls: "tok-s" },
+        { re: "`(?:[^`\\\\]|\\\\.)*`", cls: "tok-s" },
+        { re: "\\b(?:const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|new|class|extends|import|export|from|async|await|try|catch|finally|throw|typeof|instanceof|in|of|delete|void|this|null|undefined|true|false|yield|default)\\b", cls: "tok-k" },
+        { re: "\\b\\d+(?:\\.\\d+)?(?:px|em|rem|%|s|ms|deg)?\\b", cls: "tok-n" },
+        { re: "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()", cls: "tok-f" },
+        { re: "[{}();:,.\\[\\]]", cls: "tok-p" }
+    ];
+
+    function escHtml(s) {
+        return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function highlightCode(code, lang) {
+        if (!code) return "";
+        const rules = lang === "css" ? CSS_TOKENS : JS_TOKENS;
+        const combined = new RegExp(rules.map(r => "(" + r.re + ")").join("|"), "g");
+        let out = "";
+        let last = 0;
+        let m;
+        while ((m = combined.exec(code))) {
+            out += escHtml(code.slice(last, m.index));
+            let cls = "";
+            for (let i = 0; i < rules.length; i++) {
+                if (m[i + 1] !== undefined) { cls = rules[i].cls; break; }
+            }
+            out += '<span class="' + cls + '">' + escHtml(m[0]) + "</span>";
+            last = m.index + m[0].length;
+        }
+        out += escHtml(code.slice(last));
+        return out;
+    }
+
+    function createCodeEditor(file) {
+        const wrap = document.createElement("div");
+        wrap.className = "code-editor";
+
+        const pre = document.createElement("pre");
+        pre.className = "code-highlight";
+        pre.setAttribute("aria-hidden", "true");
+        const code = document.createElement("code");
+        code.className = "code-highlight-inner";
+        pre.appendChild(code);
+
+        const textarea = document.createElement("textarea");
+        textarea.spellcheck = false;
+        textarea.className = "code-input";
+        textarea.value = file.content;
+        textarea.setAttribute("autocomplete", "off");
+        textarea.setAttribute("autocorrect", "off");
+        textarea.setAttribute("autocapitalize", "off");
+
+        function refresh() {
+            const lang = file.type === "js" ? "js" : "css";
+            code.innerHTML = highlightCode(textarea.value, lang);
+        }
+
+        function notify() {
+            file.content = textarea.value;
+            isDirty = true;
+            updateSaveButtonState();
+            refresh();
+        }
+
+        textarea.addEventListener("input", notify);
+        textarea.addEventListener("scroll", () => {
+            pre.scrollTop = textarea.scrollTop;
+            pre.scrollLeft = textarea.scrollLeft;
+        });
+
+        textarea.addEventListener("keydown", (e) => {
+            if (e.key === "Tab") {
+                e.preventDefault();
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const val = textarea.value;
+                const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+                if (e.shiftKey && start !== end) {
+                    // outdent each selected line
+                    const out = val.slice(lineStart, end).split("\n").map(l => l.replace(/^( {1,4}|\t)/, "")).join("\n");
+                    textarea.value = val.slice(0, lineStart) + out + val.slice(end);
+                    textarea.selectionStart = lineStart;
+                    textarea.selectionEnd = lineStart + out.length;
+                    notify();
+                } else if (e.shiftKey) {
+                    const lineEnd = val.indexOf("\n", start) === -1 ? val.length : val.indexOf("\n", start);
+                    const line = val.slice(lineStart, lineEnd);
+                    const indent = line.match(/^( {1,4}|\t)/);
+                    if (indent) {
+                        textarea.value = val.slice(0, lineStart) + line.slice(indent[0].length) + val.slice(lineEnd);
+                        textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, start - indent[0].length);
+                        notify();
+                    }
+                } else if (start === end) {
+                    textarea.value = val.slice(0, start) + "    " + val.slice(end);
+                    textarea.selectionStart = textarea.selectionEnd = start + 4;
+                    notify();
+                } else {
+                    const indented = val.slice(lineStart, end).split("\n").map(l => "    " + l).join("\n");
+                    textarea.value = val.slice(0, lineStart) + indented + val.slice(end);
+                    textarea.selectionStart = lineStart;
+                    textarea.selectionEnd = lineStart + indented.length;
+                    notify();
+                }
+            } else if (e.key === "Enter") {
+                e.preventDefault();
+                const val = textarea.value;
+                const start = textarea.selectionStart;
+                const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+                const line = val.slice(lineStart, start);
+                const indent = line.match(/^[\t ]*/)[0];
+                const nextIndent = /[{\[(]$/.test(line.trim()) ? indent + "    " : indent;
+                textarea.value = val.slice(0, start) + "\n" + nextIndent + val.slice(start);
+                textarea.selectionStart = textarea.selectionEnd = start + 1 + nextIndent.length;
+                notify();
+            }
+        });
+
+        wrap.appendChild(pre);
+        wrap.appendChild(textarea);
+        refresh();
+        return wrap;
+    }
 
     // ── Import / Export ────────────────────────────────────────
 

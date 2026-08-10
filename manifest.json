@@ -4,7 +4,7 @@
   "version": "0.2.89",
   "description": "Adds convenient search buttons to IMDb, MyAnimeList, and Goodreads, with profiles, per-site settings, and context menu.",
 
-  "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
+  "permissions": ["tabs", "storage", "activeTab", "contextMenus", "scripting"],
   "host_permissions": ["*://www.imdb.com/*", "*://myanimelist.net/*", "*://www.goodreads.com/*", "*://api.jikan.moe/*", "*://v3.sg.media-imdb.com/*"],
 
   "browser_specific_settings": {

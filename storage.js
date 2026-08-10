@@ -140,6 +140,15 @@ function _extractDomains(state) {
             };
         }
     }
+    if (state.addons) {
+        d._a = state.addons.map(addon => ({
+            id: addon.id, domain: addon.domain, name: addon.name,
+            enabled: addon.enabled !== false,
+            files: (addon.files || []).map(f => ({
+                id: f.id, name: f.name, type: f.type, content: f.content || "", enabled: f.enabled !== false
+            }))
+        }));
+    }
     return d;
 }
 
@@ -148,6 +157,8 @@ function _applyDomain(syncKey, data, target) {
         Object.assign(target, data);
     } else if (syncKey === "_e") {
         target.searchEngines = data;
+    } else if (syncKey === "_a") {
+        target.addons = data;
     } else if (syncKey.startsWith("_p_")) {
         const pid = syncKey.slice(3);
         if (!target.profiles) target.profiles = {};

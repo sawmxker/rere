@@ -743,3 +743,287 @@ select:focus {
         flex-direction: column;
     }
 }
+
+/* ── Addons ──────────────────────────────────────────────── */
+
+.compact-toggle {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.compact-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.compact-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border-strong);
+    border-radius: 18px;
+    transition: background 0.2s;
+}
+
+.compact-toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 12px;
+    width: 12px;
+    left: 3px;
+    bottom: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+.compact-toggle input:checked + .compact-toggle-slider {
+    background: #34c759;
+}
+
+.compact-toggle input:checked + .compact-toggle-slider::before {
+    transform: translateX(16px);
+}
+
+.addon-card-header {
+    gap: 6px;
+}
+
+.addon-chevron {
+    color: #888;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+    user-select: none;
+}
+
+.addon-chevron.open {
+    transform: rotate(90deg);
+}
+
+.addon-title .engine-title-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.addon-name-input,
+.addon-domain-input {
+    display: block;
+    width: 100%;
+    padding: 2px 4px;
+    font-size: 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text);
+}
+
+.addon-name-input:hover,
+.addon-domain-input:hover {
+    border-color: var(--border-strong);
+}
+
+.addon-name-input:focus,
+.addon-domain-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--panel-muted);
+}
+
+.addon-domain-input {
+    color: #888;
+    font-size: 11px;
+}
+
+.addon-panes {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+    align-items: stretch;
+}
+
+.addon-tree {
+    width: 200px;
+    flex-shrink: 0;
+    background: var(--panel-muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.addon-tree-header {
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.addon-add-file-row {
+    display: flex;
+    gap: 4px;
+    padding: 6px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+}
+
+.addon-file-list {
+    overflow-y: auto;
+    min-height: 120px;
+    max-height: 420px;
+}
+
+.addon-file-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 2px 4px;
+    transition: background 0.1s;
+}
+
+.addon-file-item:hover {
+    background: var(--panel-soft);
+}
+
+.addon-file-item.selected {
+    background: rgba(245, 197, 24, 0.12);
+}
+
+.addon-file-item.disabled-file .addon-file-name {
+    color: #555;
+    text-decoration: line-through;
+}
+
+.addon-file-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: monospace;
+}
+
+.addon-file-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+}
+
+.addon-editor-pane {
+    flex: 1;
+    min-width: 0;
+}
+
+.addon-file-editor {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 200px;
+}
+
+.addon-file-editor-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.addon-filename-input {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: monospace;
+}
+
+.addon-filetype-select {
+    width: auto;
+    padding: 4px 6px;
+    font-size: 11px;
+}
+
+/* Code editor */
+.code-editor {
+    position: relative;
+    flex: 1;
+    min-height: 180px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--panel-muted);
+}
+
+.code-highlight {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 10px 12px;
+    overflow: auto;
+    pointer-events: none;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.code-highlight-inner {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    font-variant-ligatures: none;
+}
+
+.code-input {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 180px;
+    margin: 0;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--text);
+    resize: vertical;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow: auto;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    tab-size: 4;
+}
+
+.code-input:focus {
+    outline: none;
+}
+
+.code-input::selection {
+    background: rgba(245, 197, 24, 0.3);
+    color: transparent;
+}
+
+.tok-c { color: #6a9955; font-style: italic; }
+.tok-s { color: #ce9178; }
+.tok-a { color: #c586c0; }
+.tok-h { color: #d19a66; }
+.tok-n { color: #b5cea8; }
+.tok-p { color: #808080; }
+.tok-k { color: #569cd6; }
+.tok-f { color: #dcdcaa; }

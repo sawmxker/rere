@@ -29,6 +29,7 @@
         <div class="tab-bar">
             <button type="button" class="tab-btn active" data-tab="main">Main Settings</button>
             <button type="button" class="tab-btn" data-tab="additional">Additional Settings</button>
+            <button type="button" class="tab-btn" data-tab="addons">Addons</button>
             <button type="button" class="tab-btn" data-tab="help">Help</button>
         </div>
 
@@ -347,6 +348,34 @@
             </div>
         </div>
 
+        <div id="tabAddons" class="tab-panel">
+            <div class="section">
+                <h2>Addons</h2>
+                <div class="section-description" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span>Manage per-site style and script overrides. Each addon is a folder bound to a site (for example <span class="help-code">myanimelist.net</span>). Inside a folder you can create files — a page style (CSS) or a script (JS). CSS rules get <span class="help-code">!important</span> automatically, so your changes override the site's own styles. This lets advanced users add a dark theme to any site, integrate a third-party player, and more.</span>
+                    <button type="button" id="openAddonBuilderBtn" class="mini-btn" style="flex-shrink:0;">+ Add Addon</button>
+                </div>
+
+                <div class="builder-box" id="addonBuilderBox" style="display:none;">
+                    <div class="engine-fields">
+                        <div>
+                            <label for="addonDomain">Site domain</label>
+                            <input type="text" id="addonDomain" placeholder="myanimelist.net">
+                            <div class="help-text">The addon is applied to pages on this domain.</div>
+                        </div>
+                        <div>
+                            <label for="addonName">Name</label>
+                            <input type="text" id="addonName" placeholder="MyAnimeList tweaks">
+                        </div>
+                    </div>
+                    <button type="button" id="addAddonBtn" class="mini-btn" style="margin-top:16px;">Add Addon Folder</button>
+                    <button type="button" id="cancelAddonBtn" class="mini-btn" style="margin-top:16px;display:none;">Cancel</button>
+                </div>
+
+                <div id="addonsList"></div>
+            </div>
+        </div>
+
         <div id="tabHelp" class="tab-panel">
             <div class="section">
                 <h2>Help</h2>
@@ -404,7 +433,6 @@
                 <h3 style="margin:20px 0 12px 0;font-size:15px;color:var(--accent);">About reré</h3>
 
                 <div style="font-size:13px;color:#ccc;line-height:1.7;">
-                    <p>reré: Quick ReSearching &mdash; version <span id="helpVersion">0.2.87</span></p>
                     <p>If you encounter issues or have suggestions, please report them on <a href="https://github.com/sawmxker/rere/issues" target="_blank" style="color:var(--accent);">GitHub</a>.</p>
                 </div>
             </div>

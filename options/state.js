@@ -85,7 +85,8 @@ window.__RERE_OPTIONS_STATE__ = (function () {
             malQuickLink: true,
             searchTitleMode: "original",
             searchTitleModeGR: "edition",
-            grSubtleBorder: false
+            grSubtleBorder: false,
+            addons: []
         };
     }
 
@@ -265,6 +266,29 @@ window.__RERE_OPTIONS_STATE__ = (function () {
         };
     }
 
+    function normalizeAddonFile(raw) {
+        const type = raw?.type === "js" ? "js" : "css";
+        return {
+            id: raw?.id || makeId("addonfile"),
+            name: (raw?.name || (type === "css" ? "style.css" : "script.js")).trim(),
+            type,
+            content: typeof raw?.content === "string" ? raw.content : "",
+            enabled: raw?.enabled !== false
+        };
+    }
+
+    function normalizeAddon(raw) {
+        let domain = (raw?.domain || "").trim();
+        domain = domain.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].split(":")[0].trim();
+        return {
+            id: raw?.id || makeId("addon"),
+            domain,
+            name: (raw?.name || raw?.domain || "Addon").trim(),
+            enabled: raw?.enabled !== false,
+            files: Array.isArray(raw?.files) ? raw.files.map(normalizeAddonFile) : []
+        };
+    }
+
     function normalizeSettings(raw) {
         const next = createDefaultState();
         const rawSearchEngines = Array.isArray(raw.searchEngines) && raw.searchEngines.length > 0
@@ -361,6 +385,7 @@ window.__RERE_OPTIONS_STATE__ = (function () {
         if (typeof raw.malQuickLink === "boolean") next.malQuickLink = raw.malQuickLink;
         if (raw.searchTitleMode === "original" || raw.searchTitleMode === "english") next.searchTitleMode = raw.searchTitleMode;
         if (raw.searchTitleModeGR === "edition" || raw.searchTitleModeGR === "original") next.searchTitleModeGR = raw.searchTitleModeGR;
+        next.addons = Array.isArray(raw.addons) ? raw.addons.map(normalizeAddon).filter(a => a.domain) : [];
         const active = next.profiles[next.activeProfileId];
         if (active) {
             next.suffix = active.suffix;
@@ -448,7 +473,20 @@ window.__RERE_OPTIONS_STATE__ = (function () {
             malQuickLink: state.malQuickLink,
             searchTitleMode: state.searchTitleMode,
             searchTitleModeGR: state.searchTitleModeGR,
-            grSubtleBorder: state.grSubtleBorder
+            grSubtleBorder: state.grSubtleBorder,
+            addons: state.addons.map((addon) => ({
+                id: addon.id,
+                domain: addon.domain,
+                name: addon.name,
+                enabled: addon.enabled !== false,
+                files: (addon.files || []).map((file) => ({
+                    id: file.id,
+                    name: file.name,
+                    type: file.type === "js" ? "js" : "css",
+                    content: file.content || "",
+                    enabled: file.enabled !== false
+                }))
+            }))
         };
     }
 
@@ -588,6 +626,7 @@ window.__RERE_OPTIONS_STATE__ = (function () {
         replaceUrlPlaceholders, getOriginFromUrl, extractTargetDomainFromQuery,
         getFaviconUrl, extractDomainsFromUrl, isValidHttpUrl,
         normalizeQueryMode, normalizeSearchEngine, normalizeMenuItem, normalizeCustomEngine,
+        normalizeAddon, normalizeAddonFile,
         normalizeSettings, serializeSettings, moveItem,
         getSearchEngineById, getActiveProfile, saveCurrentProfileToState, loadProfileIntoState,
         createFallbackIcon, createFaviconElement,

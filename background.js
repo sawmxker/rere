@@ -1,11 +1,15 @@
-browser.runtime.onInstalled.addListener(() => setTimeout(updateContextMenus, 500));
+browser.runtime.onInstalled.addListener(() => {
+    setTimeout(() => updateContextMenus(), 500);
+    setTimeout(syncAddonContentScripts, 500);
+});
 browser.storage.onChanged.addListener((changes, areaName) => {
     storageInvalidateSyncCache();
     storageGetSyncEnabled().then(syncEnabled => {
         if (syncEnabled && areaName === "sync") {
-            storagePullFromSync().then(() => updateContextMenus());
+            storagePullFromSync().then(() => { updateContextMenus(); syncAddonContentScripts(); });
         } else if (!syncEnabled && areaName === "local") {
             updateContextMenus();
+            syncAddonContentScripts();
         }
     });
 });
@@ -164,6 +168,81 @@ async function imdbSearchTitle(title, year) {
         }
     } catch {}
     return null;
+}
+
+function normalizeAddonDomain(domain) {
+    let d = String(domain || "").toLowerCase().trim();
+    d = d.replace(/^https?:\/\//, "");
+    d = d.replace(/^www\./, "");
+    d = d.split("/")[0];
+    d = d.split(":")[0];
+    return d.trim();
+}
+
+function domainToMatchPatterns(domain) {
+    const d = normalizeAddonDomain(domain);
+    if (!d || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(d)) return [];
+    return [`*://${d}/*`, `*://*.${d}/*`];
+}
+
+function samePatterns(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    return a.every((p, i) => p === b[i]);
+}
+
+async function syncAddonContentScripts() {
+    if (!browser.scripting || !browser.scripting.registerContentScripts) return;
+    try {
+        const data = await storageGet(null);
+        const addons = Array.isArray(data.addons) ? data.addons : [];
+        const wanted = {};
+        addons.forEach((addon) => {
+            if (!addon || addon.enabled === false) return;
+            const patterns = domainToMatchPatterns(addon.domain);
+            if (patterns.length > 0) wanted[`rere-addon-${addon.id}`] = patterns;
+        });
+
+        let registered = [];
+        try { registered = await browser.scripting.getRegisteredContentScripts(); } catch (e) { registered = []; }
+        const current = registered.filter(s => s.id && s.id.startsWith("rere-addon-"));
+        const currentIds = current.map(s => s.id);
+
+        const removeIds = current.filter(s => !wanted[s.id]).map(s => s.id);
+        for (const id of removeIds) {
+            try { await browser.scripting.unregisterContentScripts({ ids: [id] }); }
+            catch (e) { console.warn("Failed to unregister addon content script", id, e); }
+        }
+
+        const toAdd = [];
+        for (const [id, patterns] of Object.entries(wanted)) {
+            const existing = current.find(s => s.id === id);
+            if (existing && samePatterns(existing.matches, patterns)) continue;
+            if (existing) {
+                try { await browser.scripting.unregisterContentScripts({ ids: [id] }); }
+                catch (e) { console.warn("Failed to re-register addon content script", id, e); }
+            }
+            toAdd.push({
+                id,
+                matches: patterns,
+                js: ["storage.js", "addons-content.js"],
+                runAt: "document_idle",
+                allFrames: false
+            });
+        }
+        for (const cs of toAdd) {
+            try { await browser.scripting.registerContentScripts([cs]); }
+            catch (e) {
+                try {
+                    await browser.permissions.request({ origins: cs.matches });
+                    await browser.scripting.registerContentScripts([cs]);
+                } catch (e2) {
+                    console.warn("Failed to register addon content script (permission needed)", cs.id, e2);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("syncAddonContentScripts failed", e);
+    }
 }
 
 browser.contextMenus.onClicked.addListener((info, tab) => {
