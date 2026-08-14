@@ -72,10 +72,6 @@ async function _loadSyncFlag() {
 
 function _setSyncFlag(val) { _syncCache = val; }
 
-async function _getArea() {
-    return (await _loadSyncFlag()) ? browser.storage.sync : browser.storage.local;
-}
-
 // ── Local metadata (per-domain timestamps) ───────────────────
 
 async function _getLocalMeta() {
@@ -234,13 +230,11 @@ async function storagePullFromSync() {
 // ── Public API ───────────────────────────────────────────────
 
 async function storageGet(keys) {
-    const area = await _getArea();
-    return area.get(keys);
+    return browser.storage.local.get(keys);
 }
 
 async function storageSet(items) {
-    const area = await _getArea();
-    await area.set(items);
+    await browser.storage.local.set(items);
     if (await _loadSyncFlag()) {
         const dm = _extractDomains(items);
         _pushDomains(dm, Date.now()).catch(e =>
@@ -250,8 +244,10 @@ async function storageSet(items) {
 }
 
 async function storageClear() {
-    const area = await _getArea();
-    await area.clear();
+    await browser.storage.local.clear();
+    if (await _loadSyncFlag()) {
+        try { await browser.storage.sync.clear(); } catch {}
+    }
 }
 
 async function storageGetSyncEnabled() { return _loadSyncFlag(); }
